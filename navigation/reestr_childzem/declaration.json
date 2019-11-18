@@ -1,0 +1,29 @@
+{
+  "code": "declaration",
+  "orderNumber": 30,
+  "type": 1,
+  "title": "",
+  "caption": "Заявления",
+  "classname": "declaration",
+  "container": null,
+  "collection": null,
+  "url": null,
+  "hint": null,
+  "conditions": [],
+  "sorting": [],
+  "pathChains": [],
+  "searchOptions": {
+    "declaration": {
+      "searchBy": [
+        "regNum",
+        "regNumOld"
+      ],
+      "splitBy": "\\s+",
+      "mode": [
+        "like",
+        "like"
+      ],
+      "joinBy": "and"
+    }
+  }
+}

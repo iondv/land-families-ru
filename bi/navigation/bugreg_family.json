@@ -1,0 +1,9 @@
+{
+  "code": "bugreg_family",
+  "caption": "Нет семьи в заявлении",
+  "parent": "bugreg",
+  "mine": "land-families-ru@childzem",
+  "report": "failFamilyLink",
+  "namespace": "land-families-ru",
+  "order": 0
+}

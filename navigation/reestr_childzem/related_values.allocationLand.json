@@ -1,0 +1,16 @@
+{
+  "code": "related_values.allocationLand",
+  "orderNumber": 40,
+  "type": 1,
+  "title": "",
+  "caption": "Данные о выделении участка",
+  "classname": "allocationLand",
+  "container": null,
+  "collection": null,
+  "url": null,
+  "hint": "В собственность",
+  "conditions": [],
+  "sorting": [],
+  "pathChains": [],
+  "metaVersion": "2.0.61.18033"
+}

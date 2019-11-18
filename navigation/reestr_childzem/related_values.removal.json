@@ -1,0 +1,15 @@
+{
+  "code": "related_values.removal",
+  "orderNumber": 100,
+  "type": 1,
+  "title": "",
+  "caption": "Снятие с учета",
+  "classname": "removal",
+  "container": null,
+  "collection": null,
+  "url": null,
+  "hint": null,
+  "conditions": [],
+  "sorting": [],
+  "pathChains": []
+}

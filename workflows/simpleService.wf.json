@@ -1,0 +1,134 @@
+{
+  "name": "simpleService",
+  "caption": "Обычный БП для обычной услуги",
+  "wfClass": "declaration",
+  "startState": "new",
+  "states": [
+    {
+      "name": "new",
+      "caption": "Новое",
+      "conditions": [],
+      "itemPermissions": [],
+      "propertyPermissions": [],
+      "selectionProviders": []
+    },
+    {
+      "name": "inWork",
+      "caption": "В обработке",
+      "conditions": [],
+      "itemPermissions": [],
+      "propertyPermissions": [],
+      "selectionProviders": []
+    },
+    {
+      "name": "consideration",
+      "caption": "На рассмотрении",
+      "conditions": [],
+      "itemPermissions": [],
+      "propertyPermissions": [],
+      "selectionProviders": []
+    },
+    {
+      "name": "inResult",
+      "caption": "Добавление резолюции",
+      "conditions": [],
+      "itemPermissions": [],
+      "propertyPermissions": [],
+      "selectionProviders": []
+    },
+    {
+      "name": "positive",
+      "caption": "Положительное решение",
+      "conditions": [],
+      "itemPermissions": [],
+      "propertyPermissions": [],
+      "selectionProviders": []
+    },
+    {
+      "name": "refuse",
+      "caption": "Отказать",
+      "conditions": [],
+      "itemPermissions": [],
+      "propertyPermissions": [],
+      "selectionProviders": []
+    }
+  ],
+  "transitions": [
+    {
+      "name": "first",
+      "caption": "Принять в работу",
+      "startState": "new",
+      "finishState": "inWork",
+      "signBefore": false,
+      "signAfter": false,
+      "roles": [],
+      "assignments": [
+        {
+          "key": "status",
+          "value": "В обработке"
+        }
+      ],
+      "conditions": []
+    },
+    {
+      "name": "two",
+      "caption": "Завершить обработку заявления",
+      "startState": "inWork",
+      "finishState": "consideration",
+      "signBefore": false,
+      "signAfter": false,
+      "roles": [],
+      "assignments": [
+        {
+          "key": "status",
+          "value": "На рассмотрении"
+        }
+      ],
+      "conditions": []
+    },
+    {
+      "name": "toResult",
+      "caption": "К принятию решения по заявлению",
+      "startState": "consideration",
+      "finishState": "inResult",
+      "signBefore": false,
+      "signAfter": false,
+      "roles": [],
+      "assignments": [],
+      "conditions": []
+    },
+    {
+      "name": "accept",
+      "caption": "Положительное решение",
+      "startState": "inResult",
+      "finishState": "positive",
+      "signBefore": false,
+      "signAfter": false,
+      "roles": [],
+      "assignments": [
+        {
+          "key": "status",
+          "value": "Положительное решение"
+        }
+      ],
+      "conditions": []
+    },
+    {
+      "name": "cancel",
+      "caption": "Отклонить",
+      "startState": "inResult",
+      "finishState": "refuse",
+      "signBefore": false,
+      "signAfter": false,
+      "roles": [],
+      "assignments": [
+        {
+          "key": "status",
+          "value": "Отказать"
+        }
+      ],
+      "conditions": []
+    }
+  ],
+  "metaVersion": "2.0.7"
+}

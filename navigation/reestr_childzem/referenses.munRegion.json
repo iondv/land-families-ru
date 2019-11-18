@@ -1,0 +1,15 @@
+{
+  "code": "referenses.munRegion",
+  "orderNumber": 85,
+  "type": 1,
+  "title": "",
+  "caption": "Районы и муниципальные образования",
+  "classname": "munRegion",
+  "container": null,
+  "collection": null,
+  "url": null,
+  "hint": null,
+  "conditions": [],
+  "sorting": [],
+  "pathChains": []
+}

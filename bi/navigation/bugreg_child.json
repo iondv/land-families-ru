@@ -1,0 +1,9 @@
+{
+  "code": "bugreg_child",
+  "caption": "Проверка детей",
+  "parent": "bugreg",
+  "mine": "land-families-ru@childzem",
+  "report": "failChild",
+  "namespace": "land-families-ru",
+  "order": 1
+}

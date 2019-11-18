@@ -1,0 +1,31 @@
+{
+  "code": "referenses.document",
+  "orderNumber": 110,
+  "type": 1,
+  "title": "",
+  "caption": "Удостоверяющие документы",
+  "classname": "document",
+  "container": null,
+  "collection": null,
+  "url": null,
+  "hint": null,
+  "conditions": [],
+  "sorting": [],
+  "pathChains": [],
+  "searchOptions": {
+    "document": {
+      "searchBy": [
+        "ser",
+        "numDoc",
+        "org"
+      ],
+      "splitBy": "\\s+",
+      "mode": [
+        "starts",
+        "starts",
+        "like"
+      ],
+      "joinBy": "and"
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "code": "referenses.documentTypes",
+  "orderNumber": 100,
+  "type": 1,
+  "caption": "Типы документов",
+  "classname": "documentTypes",
+  "container": null,
+  "collection": null,
+  "url": null,
+  "hint": null,
+  "conditions": [],
+  "sorting": [],
+  "pathChains": []
+}

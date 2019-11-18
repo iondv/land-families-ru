@@ -1,0 +1,16 @@
+{
+  "code": "referenses.delivery",
+  "orderNumber": 90,
+  "type": 1,
+  "title": "",
+  "caption": "Способ подачи или получения",
+  "classname": "delivery",
+  "container": null,
+  "collection": null,
+  "url": null,
+  "hint": null,
+  "conditions": [],
+  "sorting": [],
+  "pathChains": [],
+  "metaVersion": "2.0.61"
+}

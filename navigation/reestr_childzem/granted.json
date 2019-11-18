@@ -1,0 +1,34 @@
+{
+  "code": "granted",
+  "orderNumber": 25,
+  "type": 1,
+  "title": "",
+  "caption": "Получившие земельный участок",
+  "classname": "family",
+  "container": null,
+  "collection": null,
+  "url": null,
+  "hint": null,
+  "conditions": [
+    {
+      "property": "grantedProperty",
+      "operation": 3,
+      "value": null,
+      "nestedConditions": []
+    }
+  ],
+  "sorting": [],
+  "pathChains": [],
+  "searchOptions": {
+    "family": {
+      "searchBy": [
+        "orderNum"
+      ],
+      "splitBy": "\\s+",
+      "mode": [
+        "like"
+      ],
+      "joinBy": "and"
+    }
+  }
+}

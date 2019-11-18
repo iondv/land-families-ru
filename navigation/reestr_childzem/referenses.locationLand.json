@@ -1,0 +1,15 @@
+{
+  "code": "referenses.locationLand",
+  "orderNumber": 40,
+  "type": 1,
+  "title": "",
+  "caption": "Местоположение земельного участка",
+  "classname": "locationLand",
+  "container": null,
+  "collection": null,
+  "url": null,
+  "hint": null,
+  "conditions": [],
+  "sorting": [],
+  "pathChains": []
+}

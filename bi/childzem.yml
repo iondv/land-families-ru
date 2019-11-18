@@ -1,0 +1,3879 @@
+name: childzem
+caption: Отчеты
+sources:
+  - name: acceptedDecision
+    caption: >-
+      Данные о принятых решениях
+#      - Выгружаем из класса acceptedDecision все
+#      принятые решения по заявлениям
+    load:
+      - className: acceptedDecision
+        results:
+          - field: declaration
+            expr: $pet.id
+          - field: typeDecision
+            expr: $type
+          - field: dateDecision
+            expr: $date
+    index:
+      - declaration
+  - name: outRegs
+    caption: Снятия с учета
+#     - Выгружаем из класса removal все снятия с учета
+    load:
+      - className: removal
+        filter:
+          and:
+            - nempty:
+              - $fam.id
+        results:
+          - field: fam
+            expr: $fam.id
+          - field: declaration
+            expr: $declaration.id
+          - field: reas
+            expr: $reas
+          - field: date
+            expr: $date
+    index:
+      - fam
+  - name: statementDeclarations
+    caption: >-
+      Все заявления на постановку
+#       - Выгружаем из класса declaration все
+#      заявления на постановку
+    load:
+      - className: declaration
+        filter:
+          ne:
+            - $typePet
+            - null
+        results:
+          - field: fam
+            expr: $fam.id
+          - field: declaration
+            expr: $id
+          - field: regDate
+            expr: $regDate
+          - field: regNum
+            expr: $regNum
+          - field: queue
+            expr: $queue
+          - field: decision
+            expr: $account.type
+    index:
+      - declaration
+      - fam
+  - name: maxAcceptedDecisionByFam
+    caption: >-
+      Последнее принятое решение
+#       - Объединение: {Выгружаем из класса declaration
+#      все заявления на постановку - statementDeclarations} по полю declaration с
+#      {Выгружаем из класса acceptedDecision все принятые решения по заявлениям -
+#      acceptedDecision}. Далее выбираем у каждой семьи последнюю дату принятого
+#      решения из заявлений.
+    load:
+      - source: statementDeclarations
+        joins:
+          - table: acceptedDecision
+            alias: decisiont
+            left: declaration
+            right: declaration
+        filter:
+          and:
+            - eq:
+              - $queue
+              - true
+            - ne:
+              - $decision
+              - refuse
+        results:
+          - field: fam
+            expr: $fam
+          - field: decisionDateMax
+            expr:
+              max:
+                - $decisiont.dateDecision
+    index:
+      - fam
+  - name: maxOutRegsByFam
+    caption: >-
+      Последнее снятие с учета
+#       - Объединение: {Выгружаем из класса declaration
+#      все заявления на постановку - statementDeclarations} по полю fam с
+#      {Выгружаем из класса removal все снятия с учета - outRegs}. Далее выбираем
+#      у каждой семьи последнюю дату снятия с учета.
+    load:
+      - source: statementDeclarations
+        joins:
+          - table: outRegs
+            alias: outregst
+            left: fam
+            right: fam
+        results:
+          - field: fam
+            expr: $fam
+          - field: outregDateMax
+            expr:
+              max:
+                - $outregst.date
+    index:
+      - fam
+  - name: statementDeclarationsChangePeriod
+    caption: >-
+      Периоды изменения заявлений на постановку (фаза 1)
+#       - Объединение:
+#      {Выгружаем из класса declaration все заявления на постановку -
+#      statementDeclarations} по полю fam с {Выгружаем из класса removal все
+#      снятия с учета - outRegs}.
+    load:
+      - source: statementDeclarations
+        joins:
+          - table: outRegs
+            alias: outregst
+            left: fam
+            right: fam
+          - table: maxOutRegsByFam
+            alias: maxoutregs
+            left: fam
+            right: fam
+        results:
+          - field: fam
+            expr: $fam
+          - field: declaration
+            expr: $declaration
+          - field: regDate
+            expr: $regDate
+          - field: outregDate
+            expr: $outregst.date
+          - field: outregPeriod
+            expr:
+              if:
+                - gt:
+                    - dateDiff:
+                        - $outregst.date
+                        - $regDate
+                    - 0
+                - dateDiff:
+                    - $outregst.date
+                    - $regDate
+                - if:
+                    - lt:
+                        - $outregst.date
+                        - $maxoutregs.outregDateMax
+                    - null
+                    - 0
+    index:
+      - fam
+      - declaration
+  - name: minStatementDeclarationsByPeriod
+    caption: >-
+      Периоды изменения заявлений на постановку (фаза 2)
+#       - Выбираем заявления по
+#      минимальному периоду outregPeriod
+    load:
+      - source: statementDeclarations
+        joins:
+          - table: statementDeclarationsChangePeriod
+            alias: outregst
+            left: declaration
+            right: declaration
+        filter:
+          and:
+            - nempty:
+              - $outregst.outregPeriod
+            - nempty:
+              - $fam
+        results:
+          - field: declaration
+            expr: $declaration
+          - field: outregPeriod
+            expr:
+              min:
+                - $outregst.outregPeriod
+    index:
+      - declaration
+  - name: declarChangePeriod
+    caption: >-
+      Периоды изменения заявлений (фаза 3)
+#       - Разбивка данных по заявлениям с
+#      заполненой семьей и с минимальной разницей между снятием с
+#      учета(нахождение ближайщего снятия после заявления)
+    load:
+      - source: minStatementDeclarationsByPeriod
+        joins:
+          - table: statementDeclarationsChangePeriod
+            alias: outregst
+            left: declaration
+            right: declaration
+        filter:
+          and:
+            - eq:
+              - $outregst.outregPeriod
+              - $outregPeriod
+            - nempty:
+              - $outregst.fam
+        results:
+          - field: fam
+            expr: $outregst.fam
+          - field: declaration
+            expr: $declaration
+          - field: regDate
+            expr: $outregst.regDate
+          - field: outregDate
+            expr: $outregst.outregDate
+          - field: outregPeriod
+            expr: $outregPeriod
+    index:
+      - fam
+      - declaration
+  - name: allModifDeclarations
+    caption: >-
+      Параметры заявлений на изменение сведений
+#       - Выгружаем из класса
+#      declaration все заявления на изменение сведений (changeInfo) и без отказа
+#      в решении (refuse)
+    load:
+      - className: declaration
+        filter:
+          and:
+            - ne:
+              - $account.type
+              - refuse
+            - eq:
+              - $typePet
+              - changeInfo
+        results:
+          - field: fam
+            expr: $fam.id
+          - field: target
+            expr:
+              if:
+                - eq:
+                  - $target
+                  - individConstr
+                - Индивидуальное жилищное строительство
+                - if:
+                  - eq:
+                    - $target
+                    - gardeningFarms
+                  - 'Ведение садоводства, огородничества, дачного хозяйства'
+                  - if:
+                    - eq:
+                      - $target
+                      - countryConstr
+                    - Осуществление дачного строительства
+                    - if:
+                      - eq:
+                        - $target
+                        - gardeningHorticult
+                      - Ведение садоводства и огородничества
+                      - if:
+                        - eq:
+                          - $target
+                          - personalPartFarm
+                        - Ведение личного подсобного хозяйства
+                        - if:
+                          - eq:
+                            - $target
+                            - implemLivestock
+                          - Осуществление животноводства
+                          - if:
+                            - eq:
+                              - $target
+                              - peasantEconomy
+                            - >-
+                                Ведение крестьянского (фермерского)
+                                хозяйства
+                            - if:
+                              - eq:
+                                - $target
+                                - useExistHouse
+                              - >-
+                                Использование под существующим жилым
+                                домом
+                              - if:
+                                - $target
+                                - Не определено
+                                - Не указана
+          - field: placeDistrict
+            expr:
+              ifNull:
+                - $placeArea.district.name
+                - Не указан
+          - field: placeTown
+            expr:
+              ifNull:
+                - $placeArea.town.name
+                - Не указан
+          - field: regDate
+            expr: $regDate
+          - field: declaration
+            expr: $id
+    index:
+      - fam
+  - name: lastDeclarChange
+    caption: Последние изменения по заявлениям (для получения сведений для mapping)
+    load:
+      - source: declarChangePeriod
+        joins:
+          - table: allModifDeclarations
+            alias: amd
+            left: fam
+            right: fam
+        filter:
+          and:
+            - lt:
+              - $regDate
+              - $amd.regDate
+            - or:
+              - eq:
+                - $outregPeriod
+                - 0
+              - gt:
+                - $outregDate
+                - $amd.regDate
+        results:
+          - field: fam
+            expr: $fam
+          - field: declaration
+            expr: $declaration
+          - field: changeDate
+            expr:
+              max:
+                - $amd.regDate
+    index:
+      - fam
+      - declaration
+  - name: actualDeclData
+    caption: >-
+      Актуальные данные заявлений (для mapping)
+#      : declaration - заявление на
+#      постановку; target и placeDistrict - сведения из последнего близкого
+#      заявления на изменение сведений
+    load:
+      - source: lastDeclarChange
+        joins:
+          - table: allModifDeclarations
+            alias: amd
+            left: fam
+            right: fam
+        filter:
+          or:
+            - eq:
+              - $changeDate
+              - $amd.regDate
+            - empty:
+              - $amd.regDate
+        results:
+          - field: declaration
+            expr: $declaration
+          - field: target
+            expr: $amd.target
+          - field: placeDistrict
+            expr: $amd.placeDistrict
+          - field: placeTown
+            expr: $amd.placeTown
+    index:
+      - declaration
+  - name: regDateFamily
+    caption: >-
+      Первоначальные заявления на постановку по семьям
+    load:
+      - className: declaration
+        filter:
+          eq:
+            - $typePet
+            - statement
+        results:
+          - field: fam
+            expr: $fam.id
+          - field: regDate
+            expr:
+              min:
+                - $regDate
+    index:
+      - fam
+  - name: baseFamilyDeclarations
+    caption: >-
+      Первоначальные заявления на постановку по семьям
+#       - Выгружаем из класса
+#      declaration все заявления на постановку, группируя по семье
+#      (fam.id) и затем отбирая по минимальной regDate одно заявление
+    load:
+      - source: regDateFamily
+        joins:
+          - table: statementDeclarations
+            alias: sd
+            left: fam
+            right: fam
+        filter:
+          and:
+            - eq:
+              - $regDate
+              - $sd.regDate
+            - nempty:
+              - $sd.fam
+        results:
+          - field: fam
+            expr: $fam
+          - field: regDate
+            expr: $regDate
+          - field: regNum
+            expr:
+              min:
+                - $sd.regNum
+    index:
+      - fam
+  - name: cancelFamily
+    caption: Информация об отказах по семьям
+    load:
+      - className: refusalAbsence
+        filter:
+          and:
+            - eq:
+              - $typeRefuse
+              - failure
+            - nempty:
+              - $fam
+        results:
+          - field: family
+            expr: $fam.id
+          - field: info
+            expr:
+              if:
+                - $authority
+                - concat:
+                    - $authority
+                    - ' от '
+                    - format:
+                      - $date
+                      - 'DD.MM.YYYY'
+                - null
+          - field: authority
+            expr: $authority
+          - field: date
+            expr: $date
+    index:
+      - family
+  - name: absenceFamily
+    caption: Информация о неявках по семьям
+    load:
+      - className: refusalAbsence
+        filter:
+          and:
+            - eq:
+              - $typeRefuse
+              - absence
+            - nempty:
+              - $fam
+        results:
+          - field: family
+            expr: $fam.id
+          - field: info
+            expr:
+              if:
+                - $authority
+                - concat:
+                    - $authority
+                    - ' от '
+                    - format:
+                      - $date
+                      - 'DD.MM.YYYY'
+                - null
+          - field: authority
+            expr: $authority
+          - field: date
+            expr: $date
+    index:
+      - family
+  - name: declParamsChild
+    caption: Отчетные параметры заявлений по детям в семье
+    load:
+      - className: declaration
+# первый фильтр - должна быть хотя бы семья и в ней дети без битых ссылок
+# группировка по семье и заявлению
+        filter:
+          and:
+            - nempty:
+              - $fam.id
+            - nempty:
+              - $fam.childs
+        results:
+          - field: declaration
+            expr: $id
+          - field: family
+            expr: $fam.id
+          - field: notAdults
+            expr:
+              sum:
+                - if:
+                  - or:
+                    - empty:
+                      - $fam.childs.dateBorn
+                    - lt:
+                      - $regDate
+                      - dateAdd:
+                        - $fam.childs.dateBorn
+                        - if:
+                          - or:
+                            - eq:
+                              - mod:
+                                - year:
+                                  - $fam.childs.dateBorn
+                                - 4
+                              - 1
+                            - and:
+                              - eq:
+                                - mod:
+                                  - year:
+                                    - $fam.childs.dateBorn
+                                  - 4
+                                - 2
+                              - lt:
+                                - month:
+                                  - $fam.childs.dateBorn
+                                - 3
+                            - and:
+                              - eq:
+                                - mod:
+                                  - year:
+                                    - $fam.childs.dateBorn
+                                  - 4
+                                - 0
+                              - gt:
+                                - month:
+                                  - $fam.childs.dateBorn
+                                - 2
+                          - 6574
+                          - 6575
+                        - d
+                  - 1
+                  - 0
+          # - field: fixChildAge
+          #   expr:
+          #     sum:
+          #       - if:
+          #         - if:
+          #           - gte:
+          #             - dateDiff:
+          #               - $regDate
+          #               - $fam.childs.dateBorn
+          #               - d
+          #             - 0
+          #           - if:
+          #             - gt:
+          #               - month:
+          #                 - $regDate
+          #               - month:
+          #                 - $fam.childs.dateBorn
+          #             - if:
+          #               - lt:
+          #                 - sub:
+          #                   - year:
+          #                     - $regDate
+          #                   - year:
+          #                     - $fam.childs.dateBorn
+          #                 - 18
+          #               - true
+          #               - false
+          #             - false
+          #           - 0
+          #         - 1
+          #         - 0
+    index:
+      - family
+  - name: failDeclParamsByChild
+    caption: Проверочные параметры по детям в семье
+    load:
+      - className: declaration
+        filter:
+          nempty:
+            - $fam.id
+        results:
+          - field: declaration
+            expr: $id
+          - field: regDate
+            expr: $regDate
+          - field: regNum
+            expr: $regNum
+          - field: childsCollNull
+            expr:
+              if:
+                - ifNull:
+                  - $fam.childs
+                  - 0
+                - Есть
+                - Отсутствует
+          - field: regDate
+            expr: $regDate
+          - field: childsDateBorn
+            expr: $fam.childs.dateBorn
+          - field: fioChilds
+            expr:
+              concat:
+                - if:
+                  - nempty:
+                    - $fam.childs.surname
+                  - $fam.childs.surname
+                  - ''
+                - ' '
+                - if:
+                  - nempty:
+                    - $fam.childs.name
+                  - $fam.childs.name
+                  - ''
+                - ' '
+                - if:
+                  - nempty:
+                    - $fam.childs.patronymic
+                  - $fam.childs.patronymic
+                  - ''
+          - field: emptyChilds
+            expr:
+              if:
+                - ifNull:
+                  - $fam.childs.id
+                  - 0
+                - Есть
+                - Отсутствует
+# влияет на отчеты
+          - field: childsAgeByDecl
+            expr:
+              if:
+                - ifNull:
+                  - $fam.childs.dateBorn
+                  - 0
+                - 'Проблем не обнаружено'
+                - 'Дата рождения пустая'
+    index:
+      - declaration
+  - name: failDeclParams
+    caption: Проверочные параметры заявлений
+    load:
+      - className: declaration
+        results:
+          - field: declaration
+            expr: $id
+          - field: nkar
+            expr: $__nkar
+          - field: bdName
+            expr: $__bdName
+          - field: bdNkar
+            expr:
+              concat:
+                - $__nkar
+                - ' '
+                - $__bdName
+          - field: queue
+            expr: $queue
+          - field: placeDistrict
+            expr:
+              ifNull:
+                - $placeArea.district.name
+                - Не указан
+          - field: placeTown
+            expr:
+              ifNull:
+                - $placeArea.town.name
+                - Не указан
+          - field: fam
+            expr: $fam.id
+          - field: regDate
+            expr: $regDate
+          - field: regNum
+            expr: $regNum
+          - field: familyLinkNull
+            expr:
+              if:
+                - ifNull:
+                  - $fam.id
+                  - 0
+                - Есть
+                - Отсутствует
+          - field: emptyChilds
+            expr:
+              if:
+                - ifNull:
+                  - $fam.childs
+                  - 0
+                - Есть
+                - Отсутствует
+          - field: fioMother
+            expr:
+              concat:
+                - if:
+                  - nempty:
+                    - $fam.mother.surname
+                  - $fam.mother.surname
+                  - ''
+                - ' '
+                - if:
+                  - nempty:
+                    - $fam.mother.name
+                  - $fam.mother.name
+                  - ''
+                - ' '
+                - if:
+                  - nempty:
+                    - $fam.mother.patronymic
+                  - $fam.mother.patronymic
+                  - ''
+          - field: emptyParents
+            expr:
+              if:
+                - and:
+                  - ifNull:
+                    - $fam.mother.id
+                    - 0
+                  - ifNull:
+                    - $fam.father.id
+                    - 0
+                - Два родителя
+                - if:
+                  - or:
+                    - ifNull:
+                      - $fam.mother.id
+                      - 0
+                    - ifNull:
+                      - $fam.father.id
+                      - 0
+                  - Один родитель
+                  - Отсутствуют
+          - field: fioFather
+            expr:
+              concat:
+                - if:
+                  - nempty:
+                    - $fam.father.surname
+                  - $fam.father.surname
+                  - ''
+                - ' '
+                - if:
+                  - nempty:
+                    - $fam.father.name
+                  - $fam.father.name
+                  - ''
+                - ' '
+                - if:
+                  - nempty:
+                    - $fam.father.patronymic
+                  - $fam.father.patronymic
+                  - ''
+    index:
+      - declaration
+  - name: familyParams
+    caption: Отчетные параметры семьи
+    load:
+      - source: declParamsChild
+# к информации о детях добавляется информация о снятиях с учета
+# каждое снятие с учета будет включать информацию по семье, детям, заявлению
+        joins:
+          - table: outRegs
+            alias: outregparam
+            left: declaration
+            right: declaration
+        results:
+          - field: declaration
+            expr: $declaration
+          - field: family
+            expr: $family
+          - field: notAdults
+            expr: $notAdults
+          - field: familyNotOutReg
+            expr:
+              if:
+                - $outregparam.fam
+                - false
+                - true
+          - field: familyOutRegReas
+            expr: $outregparam.reas
+          - field: familyOutRegDate
+            expr: $outregparam.date
+          - field: familyOutDeclaration
+            expr: $outregparam.declaration
+    index:
+      - declaration
+  - name: declParamsByLink
+    caption: Отчетные параметры заявлений по ссылкам
+    load:
+      - className: declaration
+# первый фильтр - должна быть хотя бы семья и в ней дети без битых ссылок
+        filter:
+          and:
+            - nempty:
+              - $fam.id
+            - nempty:
+              - $fam.childs
+        results:
+          - field: declaration
+            expr: $id
+          - field: family
+            expr: $fam.id
+          - field: queue
+            expr: $queue
+          - field: nkar
+            expr: $__nkar
+          - field: bdName
+            expr: $__bdName
+          - field: regNum
+            expr: $regNum
+          - field: fioApplicant
+            expr:
+              concat:
+                - if:
+                  - nempty:
+                    - $app.surname
+                  - $app.surname
+                  - ''
+                - ' '
+                - if:
+                  - nempty:
+                    - $app.name
+                  - $app.name
+                  - ''
+                - ' '
+                - if:
+                  - nempty:
+                    - $app.patronymic
+                  - $app.patronymic
+                  - ' '
+          # - field: contactStreet
+          #   expr: $app.actualAdr.street.name
+          - field: contactAddress
+            expr:
+              concat:
+                - if:
+                  - nempty:
+                    - $app.actualAdr.postIndex
+                  - concat:
+                    - $app.actualAdr.postIndex
+                    - ', '
+                  - ', '
+                - if:
+                  - nempty:
+                    - $app.actualAdr.town.name
+                  - concat:
+                    - $app.actualAdr.town.name
+                    - ', '
+                  - ', '
+                - if:
+                  - nempty:
+                    - $app.actualAdr.street.name
+                  - concat:
+                    - 'ул. '
+                    - $app.actualAdr.street.name
+                    - ', '
+                  - ', '
+                - if:
+                  - nempty:
+                    - $app.actualAdr.house
+                  - concat:
+                    - 'д. '
+                    - $app.actualAdr.house
+                    - ', '
+                  - ', '
+                - if:
+                  - nempty:
+                    - $app.actualAdr.building
+                  - concat:
+                    - 'корп. '
+                    - $app.actualAdr.building
+                    - '. '
+                  - ', '
+                - if:
+                  - nempty:
+                    - $app.actualAdr.flat
+                  - concat:
+                    - 'кв. '
+                    - $app.actualAdr.flat
+                    - '. '
+                  - ' '
+          - field: contactApplicant
+            expr:
+              concat:
+                - if:
+                  - nempty:
+                    - $app.actualAdr.postIndex
+                  - concat:
+                    - $app.actualAdr.postIndex
+                    - ', '
+                  - ', '
+                - if:
+                  - nempty:
+                    - $app.actualAdr.town.name
+                  - concat:
+                    - $app.actualAdr.town.name
+                    - ', '
+                  - ', '
+                - if:
+                  - nempty:
+                    - $app.actualAdr.street.name
+                  - concat:
+                    - 'ул. '
+                    - $app.actualAdr.street.name
+                    - ', '
+                  - ', '
+                - if:
+                  - nempty:
+                    - $app.actualAdr.house
+                  - concat:
+                    - 'д. '
+                    - $app.actualAdr.house
+                    - ', '
+                  - ', '
+                - if:
+                  - nempty:
+                    - $app.actualAdr.building
+                  - concat:
+                    - 'корп. '
+                    - $app.actualAdr.building
+                    - '. '
+                  - ', '
+                - if:
+                  - nempty:
+                    - $app.actualAdr.flat
+                  - concat:
+                    - 'кв. '
+                    - $app.actualAdr.flat
+                    - '. '
+                  - ', '
+                - if:
+                  - nempty:
+                    - $app.phone
+                  - concat:
+                    - 'Тел. '
+                    - $app.phone
+                  - ' '
+          - field: contactPhone
+            expr:
+              if:
+                - nempty:
+                  - $app.phone
+                - concat:
+                  - 'Тел. '
+                  - $app.phone
+                - ''
+          - field: contactEmail
+            expr:
+              if:
+                - nempty:
+                  - $app.email
+                - $app.email
+                - ''
+          - field: placeArea
+            expr:
+              concat:
+                - ifNull:
+                  - $placeArea.town.name
+                  - Не указан
+                - ' ('
+                - ifNull:
+                  - $placeArea.district.name
+                  - Не указан
+                - )
+          - field: regDate
+            expr: $regDate
+          - field: target
+            expr:
+              if:
+                - eq:
+                  - $target
+                  - individConstr
+                - Индивидуальное жилищное строительство
+                - if:
+                  - eq:
+                    - $target
+                    - gardeningFarms
+                  - 'Ведение садоводства, огородничества, дачного хозяйства'
+                  - if:
+                    - eq:
+                      - $target
+                      - countryConstr
+                    - Осуществление дачного строительства
+                    - if:
+                      - eq:
+                        - $target
+                        - gardeningHorticult
+                      - Ведение садоводства и огородничества
+                      - if:
+                        - eq:
+                          - $target
+                          - personalPartFarm
+                        - Ведение личного подсобного хозяйства
+                        - if:
+                          - eq:
+                            - $target
+                            - implemLivestock
+                          - Осуществление животноводства
+                          - if:
+                            - eq:
+                              - $target
+                              - peasantEconomy
+                            - >-
+                              Ведение крестьянского (фермерского)
+                              хозяйства
+                            - if:
+                              - eq:
+                                - $target
+                                - useExistHouse
+                              - >-
+                                Использование под существующим жилым
+                                домом
+                              - if:
+                                - $target
+                                - Не определено
+                                - Не указана
+          - field: type
+            expr: $typePet
+          - field: declOrderNum
+            expr: $orderNum
+            # номер очереди берем из заявления, а не из семьи
+          - field: familyOwn
+            expr: $fam.own
+          - field: familyProvidedRent
+            expr:
+              if:
+                - and:
+                  - $fam.providedRent.id
+                  - not:
+                    - $fam.grantedProperty.id
+                  - not:
+                    - $fam.rentCancel
+                - true
+                - false
+          - field: familyProvidedRentCancel
+            expr:
+              if:
+                - $fam.rentCancel
+                - true
+                - false
+          - field: familyProvidedRentInfo
+            expr:
+              if:
+                - $fam.providedRent.id
+                - concat:
+                    - $fam.providedRent.cadNum
+                    - ' '
+                    - $fam.providedRent.town.name
+                - null
+          - field: parents
+            expr:
+              if:
+                - $fam.id
+                - 1
+                - 0
+          - field: allocatedPlots
+            expr:
+              add:
+                - if:
+                    - $fam.grantedProperty.id
+                    - 1
+                    - 0
+                - if:
+                    - $fam.providedRent.id
+                    - 1
+                    - 0
+          - field: placeDistrict
+            expr:
+              ifNull:
+                - $placeArea.district.name
+                - Не указан
+          - field: placeTown
+            expr:
+              ifNull:
+                - $placeArea.town.name
+                - Не указан
+    index:
+      - declaration
+      - fam
+  - name: declParams
+    caption: >-
+      Отчетные параметры заявлений
+    load:
+      - source: declParamsByLink
+        joins:
+          - table: familyParams
+            alias: familyparam
+            left: declaration
+            right: declaration
+          - table: acceptedDecision
+            alias: decisionparam
+            left: declaration
+            right: declaration
+          - table: maxOutRegsByFam
+            alias: maxoutregs
+            left: family
+            right: fam
+# параметры заявления по привязанному или подходящему снятию с учета в семье
+
+     #       - eq:
+     #         - $familyparam.familyOutRegDate
+     #         - $maxoutregs.outregDateMax
+        results:
+          - field: declaration
+            expr: $declaration
+          - field: queue
+            expr: $queue
+          - field: nkar
+            expr: $nkar
+          - field: bdName
+            expr: $bdName
+          - field: bdKodAll
+            expr:
+              if:
+                - eq:
+                  - substr:
+                    - $nkar
+                    - 0
+                    - 4
+                  - 'all\'
+                - all
+                - null
+          - field: bdKodAllMun
+            expr:
+              if:
+                - eq:
+                  - substr:
+                    - $nkar
+                    - 0
+                    - 4
+                  - 'all\'
+                - substr:
+                  - $nkar
+                  - 4
+                  - 2
+                - null
+          - field: regNum
+            expr: $regNum
+          - field: fioApplicant
+            expr: $fioApplicant
+          - field: contactAddress
+            expr: $contactAddress
+          - field: contactApplicant
+            expr: $contactApplicant
+          - field: contactPhone
+            expr: $contactPhone
+          - field: contactEmail
+            expr: $contactEmail
+          - field: placeArea
+            expr: $placeArea
+          - field: regDate
+            expr: $regDate
+          - field: fam
+            expr: $family
+          - field: notAdults
+            expr: $familyparam.notAdults
+          - field: target
+            expr: $target
+          - field: type
+            expr: $type
+          - field: decision
+            expr: $decisionparam.typeDecision
+          - field: decisionDate
+            expr: $decisionparam.dateDecision
+          - field: declOrderNum
+            expr: $declOrderNum
+          - field: familyOwn
+            expr: $familyOwn
+          - field: familyProvidedRent
+            expr: $familyProvidedRent
+          - field: familyProvidedRentCancel
+            expr: $familyProvidedRentCancel
+          - field: familyProvidedRentInfo
+            expr: $familyProvidedRentInfo
+          - field: familyNotOutReg
+            # note: if(and(not($outReg),gt(count($declar.account,&eq($type,refuse)),0)),null,gte(max($outReg,date),max($declar.account,date,&eq($type,statement))))
+            expr: $familyparam.familyNotOutReg
+          - field: familyOutRegReas
+            expr: $familyparam.familyOutRegReas
+#              if:
+#                - and:
+#                  - lt:
+#                    - $familyparam.familyOutRegDate
+#                    - $decisionparam.dateDecision
+#                  - ne:
+#                    - $familyparam.familyOutRegDate
+#                    - null
+#                - errorDate
+#                - $familyparam.familyOutRegReas
+          - field: familyOutRegDate
+            expr: $familyparam.familyOutRegDate
+#              if:
+#                - lt:
+#                  - $familyparam.familyOutRegDate
+#                  - $decisionparam.dateDecision
+#                - null
+#                - $familyparam.familyOutRegDate
+          - field: parents
+            expr: $parents
+          - field: allocatedPlots
+            expr: $allocatedPlots
+          - field: placeDistrict
+            expr: $placeDistrict
+          - field: placeTown
+            expr: $placeTown
+    index:
+      - declaration
+      - fam
+  - name: info1
+    caption: Информация по решениям
+    load:
+      - source: declParams
+        joins:
+          - table: actualDeclData
+            alias: actualchange
+            left: declaration
+            right: declaration
+          - table: baseFamilyDeclarations
+            alias: bfd
+            left: fam
+            right: fam
+          - table: maxAcceptedDecisionByFam
+            alias: maxdecision
+            left: fam
+            right: fam
+          - table: maxOutRegsByFam
+            alias: maxoutregs
+            left: fam
+            right: fam
+        filter:
+          and:
+            - nempty:
+              - $fam
+            - eq:
+              - $queue
+              - true
+            - ne:
+              - $decision
+              - refuse
+        results:
+          - field: declarId
+            expr: $declaration
+          - field: type
+            expr: $type
+          - field: fam
+            expr: $fam
+          - field: regDate
+            expr: $regDate
+          - field: regDateBase
+            expr: $bfd.regDate
+          - field: nkar
+            expr: $nkar
+          - field: law
+            expr:
+              if:
+                - and:
+                  - ne:
+                    - substr:
+                      - $nkar
+                      - 0
+                      - 4
+                    - 'NEW\'
+                  - nempty:
+                    - $nkar
+                - '2'
+                - '3'
+          - field: bdName
+            expr: $bdName
+          - field: errorsParams
+            expr:
+              concat:
+                if:
+                  - eq:
+                    - $familyOutRegReas
+                    - errorDate
+                  - Дата снятия с учета меньше даты принятия решения по заявлению
+                  - Отсутствуют
+          - field: fioApplicant
+            expr:
+              ifNull:
+                - $fioApplicant
+                - '-'
+          - field: target
+            expr:
+              ifNull:
+                - $actualchange.target
+                - ifNull:
+                  - $target
+                  - Не указана
+          - field: refusedNoAdults
+            expr: 0
+#              sum:
+#                - if:
+#                  - and:
+#                    - eq:
+#                      - $decision
+#                      - refuse
+#                    - gte:
+#                      - $notAdults
+#                      - 3
+#                    - eq:
+#                      - $type
+#                      - statement
+#                  - 1
+#                  - 0
+          - field: refusedWithAdults
+            expr: 0
+#              sum:
+#                - if:
+#                  - and:
+#                    - eq:
+#                      - $decision
+#                      - refuse
+#                    - lt:
+#                      - $notAdults
+#                      - 3
+#                    - eq:
+#                      - $type
+#                      - statement
+#                  - 1
+#                  - 0
+          - field: orderNoAdults
+            expr:
+              sum:
+                - if:
+                  - and:
+                    - gte:
+                      - $notAdults
+                      - 3
+                    - eq:
+                      - $queue
+                      - true
+                  - $parents
+                  - 0
+          - field: checkParams
+            expr:
+              if:
+                - and:
+                  - eq:
+                    - $queue
+                    - true
+                  - ne:
+                    - $decision
+                    - refuse
+                  - eq:
+                    - $familyOutRegReas
+                    - null
+                  - eq:
+                    - $allocatedPlots
+                    - 0
+                - 1
+                - 0
+          - field: orderWithAdults
+            expr:
+              sum:
+                - if:
+                  - and:
+                    - lt:
+                      - $notAdults
+                      - 3
+                    - eq:
+                      - $queue
+                      - true
+                  - $parents
+                  - 0
+          - field: decisionDateMax
+            expr: $maxdecision.decisionDateMax
+          - field: outregDateMax
+            expr: $maxoutregs.outregDateMax
+          - field: allocPlotsNoAdults
+            expr:
+              sum:
+                - if:
+                  - and:
+                    - eq:
+                      - $queue
+                      - true
+                    - ne:
+                      - $decision
+                      - refuse
+                    - gte:
+                      - $notAdults
+                      - 3
+                    - or:
+#                      - gt:
+#                        - $allocatedPlots
+#                        - 0
+                      - eq:
+                        - $familyOutRegReas
+                        - landProperty
+                  - 1
+                  - 0
+          - field: allocPlotsWithAdults
+            expr:
+              sum:
+                - if:
+                  - and:
+                    - eq:
+                      - $queue
+                      - true
+                    - ne:
+                      - $decision
+                      - refuse
+                    - lt:
+                      - $notAdults
+                      - 3
+                    - or:
+#                      - gt:
+#                        - $allocatedPlots
+#                        - 0
+                      - eq:
+                        - $familyOutRegReas
+                        - landProperty
+                  - 1
+                  - 0
+          - field: independPlotsNoAdults
+            expr:
+              sum:
+                - if:
+                  - and:
+                    - eq:
+                      - $queue
+                      - true
+                    - ne:
+                      - $decision
+                      - refuse
+                    - gte:
+                      - $notAdults
+                      - 3
+                    - eq:
+                      - $familyOwn
+                      - true
+                  - $allocatedPlots
+                  - 0
+          - field: independPlotsWithAdults
+            expr:
+              sum:
+                - if:
+                  - and:
+                    - eq:
+                      - $queue
+                      - true
+                    - ne:
+                      - $decision
+                      - refuse
+                    - lt:
+                      - $notAdults
+                      - 3
+                    - eq:
+                      - $familyOwn
+                      - true
+                  - $allocatedPlots
+                  - 0
+          - field: receivedPlots
+            expr:
+              sum:
+                - if:
+                  - and:
+                    - eq:
+                      - $queue
+                      - true
+                    - ne:
+                      - $decision
+                      - refuse
+                    - $familyProvidedRent
+                  - $parents
+                  - 0
+          - field: transferIndependPlotsRefusal
+            expr: 0
+          - field: transferIndependPlotsAbsence
+            expr: 0
+            # пока не нужно
+              # sum:
+              #   - if:
+              #     - and:
+              #       - eq:
+              #         - $queue
+              #         - true
+              #       - ne:
+              #         - $decision
+              #         - refuse
+              #       - eq:
+              #         - $familyOwn
+              #         - true
+              #     - $parents
+              #     - 0
+          - field: unregApplicationNoAdults
+            expr:
+              sum:
+                - if:
+                  - and:
+                    - eq:
+                      - $queue
+                      - true
+                    - ne:
+                      - $decision
+                      - refuse
+                    - gte:
+                      - $notAdults
+                      - 3
+                    - eq:
+                      - $familyOutRegReas
+                      - application
+                  - $parents
+                  - 0
+          - field: unregApplicationWithAdults
+            expr:
+              sum:
+                - if:
+                  - and:
+                    - eq:
+                      - $queue
+                      - true
+                    - ne:
+                      - $decision
+                      - refuse
+                    - lt:
+                      - $notAdults
+                      - 3
+                    - eq:
+                      - $familyOutRegReas
+                      - application
+                  - $parents
+                  - 0
+          - field: unregOutsideRegionNoAdults
+            expr:
+              sum:
+                - if:
+                  - and:
+                    - eq:
+                      - $queue
+                      - true
+                    - ne:
+                      - $decision
+                      - refuse
+                    - gte:
+                      - $notAdults
+                      - 3
+                    - eq:
+                      - $familyOutRegReas
+                      - outsideRegion
+                  - $parents
+                  - 0
+          - field: unregOutsideRegionWithAdults
+            expr:
+              sum:
+                - if:
+                  - and:
+                    - eq:
+                      - $queue
+                      - true
+                    - ne:
+                      - $decision
+                      - refuse
+                    - lt:
+                      - $notAdults
+                      - 3
+                    - eq:
+                      - $familyOutRegReas
+                      - outsideRegion
+                  - $parents
+                  - 0
+          - field: unregLossRightNoAdults
+            expr:
+              sum:
+                - if:
+                  - and:
+                    - eq:
+                      - $queue
+                      - true
+                    - ne:
+                      - $decision
+                      - refuse
+                    - gte:
+                      - $notAdults
+                      - 3
+                    - or:
+                      - eq:
+                        - $familyOutRegReas
+                        - lossRight
+                      - eq:
+                        - $familyOutRegReas
+                        - death
+                  - $parents
+                  - 0
+          - field: unregLossRightWithAdults
+            expr:
+              sum:
+                - if:
+                  - and:
+                    - eq:
+                      - $queue
+                      - true
+                    - ne:
+                      - $decision
+                      - refuse
+                    - lt:
+                      - $notAdults
+                      - 3
+                    - or:
+                      - eq:
+                        - $familyOutRegReas
+                        - lossRight
+                      - eq:
+                        - $familyOutRegReas
+                        - death
+                  - $parents
+                  - 0
+          - field: placeDistrict
+            expr:
+              ifNull:
+                - $actualchange.placeDistrict
+                - ifNull:
+                  - $placeDistrict
+                  - Не указан
+          - field: placeMun
+            expr:
+              if:
+                - or:
+                  - eq:
+                    - $actualchange.placeTown
+                    - 'Хабаровск г'
+                  - eq:
+                    - $actualchange.placeTown
+                    - 'Комсомольск-на-Амуре г'
+                - $actualchange.placeTown
+                - if:
+                  - or:
+                    - eq:
+                      - $placeTown
+                      - 'Хабаровск г'
+                    - eq:
+                      - $placeTown
+                      - 'Комсомольск-на-Амуре г'
+                  - $placeTown
+                  - ifNull:
+                    - $actualchange.placeDistrict
+                    - ifNull:
+                      - $placeDistrict
+                      - Не указан
+          - field: placeTown
+            expr:
+              ifNull:
+                - $actualchange.placeTown
+                - ifNull:
+                  - $placeTown
+                  - Не указан
+      - source: declParams
+        joins:
+          - table: actualDeclData
+            alias: actualchange
+            left: declaration
+            right: declaration
+          - table: baseFamilyDeclarations
+            alias: bfd
+            left: fam
+            right: fam
+          - table: maxAcceptedDecisionByFam
+            alias: maxdecision
+            left: fam
+            right: fam
+          - table: maxOutRegsByFam
+            alias: maxoutregs
+            left: fam
+            right: fam
+        filter:
+          and:
+            - nempty:
+              - $fam
+            - eq:
+              - $decision
+              - refuse
+            - ne:
+              - $bdKodAll
+              - all
+        results:
+          - field: declarId
+            expr: $declaration
+          - field: type
+            expr: $type
+          - field: fam
+            expr: $fam
+          - field: regDate
+            expr: $regDate
+          - field: regDateBase
+            expr: $bfd.regDate
+          - field: nkar
+            expr: $nkar
+          - field: law
+            expr:
+              if:
+                - and:
+                  - ne:
+                    - substr:
+                      - $nkar
+                      - 0
+                      - 4
+                    - 'NEW\'
+                  - nempty:
+                    - $nkar
+                - '2'
+                - '3'
+          - field: bdName
+            expr: $bdName
+          - field: errorsParams
+            expr:
+              concat:
+                if:
+                  - eq:
+                    - $familyOutRegReas
+                    - errorDate
+                  - Дата снятия с учета меньше даты принятия решения по заявлению
+                  - Отсутствуют
+          - field: fioApplicant
+            expr:
+              ifNull:
+                - $fioApplicant
+                - '-'
+          - field: target
+            expr:
+              ifNull:
+                - $actualchange.target
+                - ifNull:
+                  - $target
+                  - Не указана
+          - field: refusedNoAdults
+            expr:
+              sum:
+                - if:
+                  - and:
+                    - eq:
+                      - $decision
+                      - refuse
+                    - gte:
+                      - $notAdults
+                      - 3
+                    - eq:
+                      - $type
+                      - statement
+                  - 1
+                  - 0
+          - field: refusedWithAdults
+            expr:
+              sum:
+                - if:
+                  - and:
+                    - eq:
+                      - $decision
+                      - refuse
+                    - lt:
+                      - $notAdults
+                      - 3
+                    - eq:
+                      - $type
+                      - statement
+                  - 1
+                  - 0
+          - field: orderNoAdults
+            expr: 0
+          - field: checkParams
+            expr: 0
+          - field: orderWithAdults
+            expr: 0
+          - field: decisionDateMax
+            expr: $maxdecision.decisionDateMax
+          - field: outregDateMax
+            expr: $maxoutregs.outregDateMax
+          - field: allocPlotsNoAdults
+            expr: 0
+          - field: allocPlotsWithAdults
+            expr: 0
+          - field: independPlotsNoAdults
+            expr: 0
+          - field: independPlotsWithAdults
+            expr: 0
+          - field: receivedPlots
+            expr: 0
+          - field: transferIndependPlotsRefusal
+            expr: 0
+          - field: transferIndependPlotsAbsence
+            expr: 0
+          - field: unregApplicationNoAdults
+            expr: 0
+          - field: unregApplicationWithAdults
+            expr: 0
+          - field: unregOutsideRegionNoAdults
+            expr: 0
+          - field: unregOutsideRegionWithAdults
+            expr: 0
+          - field: unregLossRightNoAdults
+            expr: 0
+          - field: unregLossRightWithAdults
+            expr: 0
+          - field: placeDistrict
+            expr:
+              ifNull:
+                - $actualchange.placeDistrict
+                - ifNull:
+                  - $placeDistrict
+                  - Не указан
+          - field: placeMun
+            expr:
+              if:
+                - or:
+                  - eq:
+                    - $actualchange.placeTown
+                    - 'Хабаровск г'
+                  - eq:
+                    - $actualchange.placeTown
+                    - 'Комсомольск-на-Амуре г'
+                - $actualchange.placeTown
+                - if:
+                  - or:
+                    - eq:
+                      - $placeTown
+                      - 'Хабаровск г'
+                    - eq:
+                      - $placeTown
+                      - 'Комсомольск-на-Амуре г'
+                  - $placeTown
+                  - ifNull:
+                    - $actualchange.placeDistrict
+                    - ifNull:
+                      - $placeDistrict
+                      - Не указан
+          - field: placeTown
+            expr:
+              ifNull:
+                - $actualchange.placeTown
+                - ifNull:
+                  - $placeTown
+                  - Не указан
+      - source: declParams
+        joins:
+          - table: actualDeclData
+            alias: actualchange
+            left: declaration
+            right: declaration
+          - table: baseFamilyDeclarations
+            alias: bfd
+            left: fam
+            right: fam
+          - table: maxAcceptedDecisionByFam
+            alias: maxdecision
+            left: fam
+            right: fam
+          - table: maxOutRegsByFam
+            alias: maxoutregs
+            left: fam
+            right: fam
+        filter:
+          and:
+            - nempty:
+              - $fam
+            - eq:
+              - $decision
+              - refuse
+            - eq:
+              - $bdKodAll
+              - all
+        results:
+          - field: declarId
+            expr: $declaration
+          - field: type
+            expr: $type
+          - field: fam
+            expr: $fam
+          - field: regDate
+            expr: $regDate
+          - field: regDateBase
+            expr: $bfd.regDate
+          - field: nkar
+            expr: $nkar
+          - field: law
+            expr:
+              if:
+                - and:
+                  - ne:
+                    - substr:
+                      - $nkar
+                      - 0
+                      - 4
+                    - 'NEW\'
+                  - nempty:
+                    - $nkar
+                - '2'
+                - '3'
+          - field: bdName
+            expr: $bdName
+          - field: errorsParams
+            expr:
+              concat:
+                if:
+                  - eq:
+                    - $familyOutRegReas
+                    - errorDate
+                  - Дата снятия с учета меньше даты принятия решения по заявлению
+                  - Отсутствуют
+          - field: fioApplicant
+            expr:
+              ifNull:
+                - $fioApplicant
+                - '-'
+          - field: target
+            expr:
+              ifNull:
+                - $actualchange.target
+                - ifNull:
+                  - $target
+                  - Не указана
+          - field: refusedNoAdults
+            expr:
+              sum:
+                - if:
+                  - and:
+                    - eq:
+                      - $decision
+                      - refuse
+                    - gte:
+                      - $notAdults
+                      - 3
+                    - eq:
+                      - $type
+                      - statement
+                  - 1
+                  - 0
+          - field: refusedWithAdults
+            expr:
+              sum:
+                - if:
+                  - and:
+                    - eq:
+                      - $decision
+                      - refuse
+                    - lt:
+                      - $notAdults
+                      - 3
+                    - eq:
+                      - $type
+                      - statement
+                  - 1
+                  - 0
+          - field: orderNoAdults
+            expr: 0
+          - field: checkParams
+            expr: 0
+          - field: orderWithAdults
+            expr: 0
+          - field: decisionDateMax
+            expr: $maxdecision.decisionDateMax
+          - field: outregDateMax
+            expr: $maxoutregs.outregDateMax
+          - field: allocPlotsNoAdults
+            expr: 0
+          - field: allocPlotsWithAdults
+            expr: 0
+          - field: independPlotsNoAdults
+            expr: 0
+          - field: independPlotsWithAdults
+            expr: 0
+          - field: receivedPlots
+            expr: 0
+          - field: transferIndependPlotsRefusal
+            expr: 0
+          - field: transferIndependPlotsAbsence
+            expr: 0
+          - field: unregApplicationNoAdults
+            expr: 0
+          - field: unregApplicationWithAdults
+            expr: 0
+          - field: unregOutsideRegionNoAdults
+            expr: 0
+          - field: unregOutsideRegionWithAdults
+            expr: 0
+          - field: unregLossRightNoAdults
+            expr: 0
+          - field: unregLossRightWithAdults
+            expr: 0
+          - field: placeDistrict
+            expr:
+              case:
+                - eq:
+                  - $bdKodAllMun
+                  - '06'
+                - 'Хабаровский р-н'
+                - eq:
+                  - $bdKodAllMun
+                  - '07'
+                - 'Вяземский  р-н'
+                - eq:
+                  - $bdKodAllMun
+                  - '08'
+                - 'Бикинский  р-н'
+                - eq:
+                  - $bdKodAllMun
+                  - '09'
+                - 'Амурский  р-н'
+                - eq:
+                  - $bdKodAllMun
+                  - '10'
+                - 'Имени Лазо  р-н'
+                - eq:
+                  - $bdKodAllMun
+                  - '12'
+                - 'Комсомольский  р-н'
+                - eq:
+                  - $bdKodAllMun
+                  - '13'
+                - 'Нанайский  р-н'
+                - eq:
+                  - $bdKodAllMun
+                  - '14'
+                - 'Ульчский  р-н'
+                - eq:
+                  - $bdKodAllMun
+                  - '15'
+                - 'Верхнебуреинский  р-н'
+                - eq:
+                  - $bdKodAllMun
+                  - '16'
+                - 'Совгаванский  р-н'
+                - eq:
+                  - $bdKodAllMun
+                  - '23'
+                - 'Николаевский  р-н'
+                - eq:
+                  - $bdKodAllMun
+                  - '24'
+                - 'Тугуро-Чумиканский  р'
+                - eq:
+                  - $bdKodAllMun
+                  - '25'
+                - 'Им. П. Осипенко  р-н'
+                - eq:
+                  - $bdKodAllMun
+                  - '26'
+                - 'Охотский  р-н'
+                - eq:
+                  - $bdKodAllMun
+                  - '27'
+                - 'Аяно-Майский  р-н'
+                - eq:
+                  - $bdKodAllMun
+                  - '29'
+                - 'Ванинский  р-н'
+                - eq:
+                  - $bdKodAllMun
+                  - '30'
+                - 'Солнечный  р-н'
+                - Не указан
+#              ifNull:
+#                - $actualchange.placeDistrict
+#                - ifNull:
+#                  - $placeDistrict
+#                  - Не указан
+          - field: placeMun
+            expr:
+              case:
+                - eq:
+                  - $bdKodAllMun
+                  - '06'
+                - 'Хабаровский р-н'
+                - eq:
+                  - $bdKodAllMun
+                  - '07'
+                - 'Вяземский  р-н'
+                - eq:
+                  - $bdKodAllMun
+                  - '08'
+                - 'Бикинский  р-н'
+                - eq:
+                  - $bdKodAllMun
+                  - '09'
+                - 'Амурский  р-н'
+                - eq:
+                  - $bdKodAllMun
+                  - '10'
+                - 'Имени Лазо  р-н'
+                - eq:
+                  - $bdKodAllMun
+                  - '12'
+                - 'Комсомольский  р-н'
+                - eq:
+                  - $bdKodAllMun
+                  - '13'
+                - 'Нанайский  р-н'
+                - eq:
+                  - $bdKodAllMun
+                  - '14'
+                - 'Ульчский  р-н'
+                - eq:
+                  - $bdKodAllMun
+                  - '15'
+                - 'Верхнебуреинский  р-н'
+                - eq:
+                  - $bdKodAllMun
+                  - '16'
+                - 'Совгаванский  р-н'
+                - eq:
+                  - $bdKodAllMun
+                  - '23'
+                - 'Николаевский  р-н'
+                - eq:
+                  - $bdKodAllMun
+                  - '24'
+                - 'Тугуро-Чумиканский  р'
+                - eq:
+                  - $bdKodAllMun
+                  - '25'
+                - 'Им. П. Осипенко  р-н'
+                - eq:
+                  - $bdKodAllMun
+                  - '26'
+                - 'Охотский  р-н'
+                - eq:
+                  - $bdKodAllMun
+                  - '27'
+                - 'Аяно-Майский  р-н'
+                - eq:
+                  - $bdKodAllMun
+                  - '29'
+                - 'Ванинский  р-н'
+                - eq:
+                  - $bdKodAllMun
+                  - '30'
+                - 'Солнечный  р-н'
+                - eq:
+                  - $bdKodAllMun
+                  - '01'
+                - 'Хабаровск г'
+                - eq:
+                  - $bdKodAllMun
+                  - '11'
+                - 'Комсомольск-на-Амуре г'
+                - eq:
+                  - $bdKodAllMun
+                  - '28'
+                - 'Комсомольск-на-Амуре г'
+                - Не указан
+          - field: placeTown
+            expr:
+              case:
+                - eq:
+                  - $bdKodAllMun
+                  - '01'
+                - 'Хабаровск г'
+                - eq:
+                  - $bdKodAllMun
+                  - '11'
+                - 'Комсомольск-на-Амуре г'
+                - eq:
+                  - $bdKodAllMun
+                  - '28'
+                - 'Комсомольск-на-Амуре г'
+                - Не указан
+#              ifNull:
+#                - $actualchange.placeTown
+#                - ifNull:
+#                  - $placeTown
+#                  - Не указан
+  - name: info2
+    caption: Выписка для администрации
+    load:
+      - source: declParams
+        joins:
+          - table: actualDeclData
+            alias: actualchange
+            left: declaration
+            right: declaration
+          - table: baseFamilyDeclarations
+            alias: bfd
+            left: fam
+            right: fam
+#          - table: cancelFamily
+#            alias: cancelFam
+#            left: fam
+#            right: family
+#          - table: maxAcceptedDecisionByFam
+#            alias: maxdecision
+#            left: fam
+#            right: fam
+#          - table: maxOutRegsByFam
+#            alias: maxoutregs
+#            left: fam
+#            right: fam
+        filter:
+          and:
+#            - if:
+#              - nempty:
+#                - $maxoutregs.outregDateMax
+#              - lt:
+#                - $maxoutregs.outregDateMax
+#                - $decisionDate
+#              - eq:
+#                - $maxdecision.decisionDateMax
+#                - $decisionDate
+#            - ne:
+#              - $parents
+#              - null
+#            - ne:
+#              - $notAdults
+#              - null
+            - nempty:
+              - $fam
+            - eq:
+              - $queue
+              - true
+            - ne:
+              - $decision
+              - refuse
+            - eq:
+              - $familyOutRegReas
+              - null
+            - ne:
+              - $familyProvidedRentCancel
+              - true
+        results:
+          - field: notAdults
+            expr: $notAdults
+          - field: queue
+            expr: $queue
+          - field: nkar
+            expr: $nkar
+          - field: parents
+            expr: $parents
+          - field: declarId
+            expr: $declaration
+          - field: regDate
+            expr: $regDate
+          - field: regDateBase
+            expr: $bfd.regDate
+          - field: fioApplicant
+            expr:
+              ifNull:
+                - $fioApplicant
+                - '-'
+          - field: contactApplicant
+            expr:
+              ifNull:
+                - $contactApplicant
+                - '-'
+          - field: placeArea
+            expr:
+              ifNull:
+                - $placeArea
+                - '-'
+          - field: orderNum
+            expr:
+              ifNull:
+                - $declOrderNum
+                - '-'
+          - field: placeDistrict
+            expr:
+              ifNull:
+                - $actualchange.placeDistrict
+                - ifNull:
+                  - $placeDistrict
+                  - Не указан
+          - field: placeTown
+            expr:
+              ifNull:
+                - $actualchange.placeTown
+                - ifNull:
+                  - $placeTown
+                  - Не указан
+      #    - field: cancelInfo
+      #      expr:
+      #        concat:
+      #          - ifNull:
+      #            - $cancelFam.info
+      #            - ''
+          - field: comment
+            expr:
+              if:
+                - lt:
+                    - $notAdults
+                    - 3
+                - Имеющие детей в возрасте старше 18 лет
+                - Имеющие детей в возрасте до 18 лет
+          - field: target
+            expr:
+              ifNull:
+                - $actualchange.target
+                - ifNull:
+                  - $target
+                  - Не указана
+          - field: fam
+            expr: $fam
+  - name: info3
+    caption: Выписка из Единого реестра граждан
+    load:
+      - source: declParams
+        joins:
+          - table: actualDeclData
+            alias: actualchange
+            left: declaration
+            right: declaration
+          - table: baseFamilyDeclarations
+            alias: bfd
+            left: fam
+            right: fam
+          - table: cancelFamily
+            alias: cancelFam
+            left: fam
+            right: family
+          - table: absenceFamily
+            alias: absenceFam
+            left: fam
+            right: family
+#          - table: maxAcceptedDecisionByFam
+#            alias: maxdecision
+#            left: fam
+#            right: fam
+          - table: maxOutRegsByFam
+            alias: maxoutregs
+            left: fam
+            right: fam
+        filter:
+          and:
+#            - if:
+#              - nempty:
+#                - $maxoutregs.outregDateMax
+#              - lt:
+#                - $maxoutregs.outregDateMax
+#                - $decisionDate
+#              - eq:
+#                - $maxdecision.decisionDateMax
+#                - $decisionDate
+#            - ne:
+#              - $parents
+#              - null
+#            - ne:
+#              - $notAdults
+#              - null
+            - nempty:
+              - $fam
+            - eq:
+              - $queue
+              - true
+            - ne:
+              - $decision
+              - refuse
+            - eq:
+              - $familyOutRegReas
+              - null
+            - ne:
+              - $familyProvidedRentCancel
+              - true
+        results:
+          - field: notAdults
+            expr: $notAdults
+          - field: queue
+            expr: $queue
+          - field: parents
+            expr: $parents
+          - field: declarId
+            expr: $declaration
+          - field: regNum
+            expr: $bfd.regNum
+          # - field: regNum
+          #   expr: $regNum
+          - field: fam
+            expr: $fam
+          - field: regDate
+            expr: $regDate
+          - field: regDateBase
+            expr: $bfd.regDate
+          - field: decisionDateMax
+            expr: $maxdecision.decisionDateMax
+          - field: outregDateMax
+            expr: $maxoutregs.outregDateMax
+          - field: familyProvidedRentInfo
+            expr:
+              ifNull:
+                - $familyProvidedRentInfo
+                - '-'
+          - field: contactAddress
+            expr:
+              ifNull:
+                - $contactAddress
+                - '-'
+          - field: contactPhone
+            expr:
+              ifNull:
+                - $contactPhone
+                - '-'
+          - field: contactEmail
+            expr:
+              ifNull:
+                - $contactEmail
+                - '-'
+          - field: placeArea
+            expr:
+              ifNull:
+                - $placeArea
+                - '-'
+          - field: orderNum
+            expr:
+              ifNull:
+                - $declOrderNum
+                - '-'
+          - field: placeDistrict
+            expr:
+              ifNull:
+                - $actualchange.placeDistrict
+                - ifNull:
+                  - $placeDistrict
+                  - Не указан
+          - field: placeMun
+            expr:
+              if:
+                - or:
+                  - eq:
+                    - $actualchange.placeTown
+                    - 'Хабаровск г'
+                  - eq:
+                    - $actualchange.placeTown
+                    - 'Комсомольск-на-Амуре г'
+                - $actualchange.placeTown
+                - if:
+                  - or:
+                    - eq:
+                      - $placeTown
+                      - 'Хабаровск г'
+                    - eq:
+                      - $placeTown
+                      - 'Комсомольск-на-Амуре г'
+                  - $placeTown
+                  - ifNull:
+                    - $actualchange.placeDistrict
+                    - ifNull:
+                      - $placeDistrict
+                      - Не указан
+          - field: placeTown
+            expr:
+              ifNull:
+                - $actualchange.placeTown
+                - ifNull:
+                  - $placeTown
+                  - Не указан
+          - field: cancelInfo
+            expr:
+              concat:
+                - ifNull:
+                  - $cancelFam.info
+                  - ''
+          - field: absenceInfo
+            expr:
+              concat:
+                - ifNull:
+                  - $absenceFam.info
+                  - ''
+          - field: comment
+            expr:
+              if:
+                - lt:
+                  - $notAdults
+                  - 3
+                - Имеющие детей в возрасте старше 18 лет
+                - Имеющие детей в возрасте до 18 лет
+          - field: target
+            expr:
+              ifNull:
+                - $actualchange.target
+                - ifNull:
+                  - $target
+                  - Не указана
+  - name: idDocs
+    caption: Удостоверения личноcти
+    load:
+      - className: document
+        results:
+          - field: person
+            expr: $person.id
+          - field: num
+            expr:
+              concat:
+                - $ser
+                - ' '
+                - $numDoc
+          - field: date
+            expr: $date
+    index:
+      - person
+  - name: family
+    caption: Семьи
+    load:
+      - className: family
+        filter:
+          nempty:
+            - $father
+        results:
+          - field: famId
+            expr: $id
+          - field: childsCount
+            expr:
+              count:
+                - if:
+                  - ifNull:
+                    - $childs
+                    - 0
+                  - 1
+                  - 0
+          - field: famBd
+            expr: $__bdName
+          - field: personId
+            expr: $father.id
+          - field: personNkar
+            expr:
+              concat:
+                - $father.__nkar
+                - ' '
+                - $father.__bdName
+          - field: personLink
+            expr: "Отец"
+          - field: fio
+            expr:
+              concat:
+                - $father.surname
+                - ' '
+                - $father.name
+                - ' '
+                - $father.patronymic
+          - field: dateBorn
+            expr: $father.dateBorn
+      - className: family
+        filter:
+          nempty:
+            - $mother
+        results:
+          - field: famId
+            expr: $id
+          - field: childsCount
+            expr:
+              count:
+                - if:
+                  - ifNull:
+                    - $childs
+                    - 0
+                  - 1
+                  - 0
+          - field: famBd
+            expr: $__bdName
+          - field: personId
+            expr: $mother.id
+          - field: personNkar
+            expr:
+              concat:
+                - $mother.__nkar
+                - ' '
+                - $mother.__bdName
+          - field: personLink
+            expr: "Мать"
+          - field: fio
+            expr:
+              concat:
+                - $mother.surname
+                - ' '
+                - $mother.name
+                - ' '
+                - $mother.patronymic
+          - field: dateBorn
+            expr: $mother.dateBorn
+      - className: family
+        filter:
+          nempty:
+            - $childs
+        results:
+          - field: famId
+            expr: $id
+          - field: childsCount
+            expr:
+              count:
+                - if:
+                  - ifNull:
+                    - $childs
+                    - 0
+                  - 1
+                  - 0
+          - field: famBd
+            expr: $__bdName
+          - field: personId
+            expr: $childs.id
+          - field: personNkar
+            expr:
+              concat:
+                - $childs.__nkar
+                - ' '
+                - $childs.__bdName
+          - field: personLink
+            expr: 
+              case:
+                - eq:
+                  - $childs.sex
+                  - "woman"
+                - "Дочь"
+                - eq:
+                  - $childs.sex
+                  - "man"
+                - "Сын"
+                - "Дитя"
+          - field: fio
+            expr:
+              concat:
+                - $childs.surname
+                - ' '
+                - $childs.name
+                - ' '
+                - $childs.patronymic
+          - field: dateBorn
+            expr: $childs.dateBorn
+    index:
+      - famId
+  - name: familyBase
+    caption: Семьи с привязкой к первоначальным заявлениям
+    load:
+      - source: family
+        joins:
+          - table: baseFamilyDeclarations
+            alias: bfd
+            left: famId
+            right: fam
+        filter:
+          nempty:
+            - $bfd.fam
+        results:
+          - field: famId
+            expr: $famId
+          - field: famBd
+            expr: $famBd
+          - field: regDate
+            expr: $bfd.regDate
+          - field: childsCount
+            expr: $childsCount
+    index:
+      - famId
+reports:
+  - name: operaionInfo2
+    caption: Оперативная инф. № 2 Ч1
+    sheets:
+      - name: operaionInfo2_1
+        caption: >-
+          Оперативная информация № 2 о количестве граждан, имеющих трех и более
+          детей, поставленных на учет для предоставления земельных участков в
+          собственность бесплатно
+        type: aggregation
+        source: info1
+        fetch:
+          placeDistrict: $placeDistrict
+          placeTown: $placeTown
+          target: $target
+          refusedNoAdults:
+            sum:
+              - $refusedNoAdults
+          refusedWithAdults:
+            sum:
+              - $refusedWithAdults
+          orderNoAdults:
+            sum:
+              - $orderNoAdults
+          orderWithAdults:
+            sum:
+              - $orderWithAdults
+        sort:
+          placeDistrict: asc
+          placeTown: asc
+          target: asc
+        filter:
+          and:
+            - if:
+              - eq:
+                - ':laws'
+                - '1'
+              - true
+              - eq:
+                - $law
+                - ':laws'
+        params:
+          laws:
+            caption: Закон
+            format: int
+            select:
+              '1': 'все'
+              '2': 'до 104'
+              '3': 'от 104'
+        rangeFilters:
+          regDateBase:
+            caption: За период с|по
+            format: date
+            inclusive: both
+        columns:
+          - field: placeDistrict
+            caption: Район земельного участка
+            filter: true
+          - field: placeTown
+            caption: Населенный пункт земельного участка
+            filter: true
+          - field: target
+            caption: Категория земли
+            filter: true
+          - field: refusedNoAdults
+            caption: >-
+              Количество вынесенных отказов о постановке на учет граждан,
+              имеющих детей до 18 лет
+            format: number
+          - field: refusedWithAdults
+            caption: >-
+              Количество вынесенных отказов о постановке на учет граждан,
+              имеющих детей старше 18 лет
+            format: number
+          - field: orderNoAdults
+            caption: >-
+              Количество граждан, поставленных на очередь для предоставления
+              земельного участка, имеющих детей до 18 лет
+            format: number
+          - field: orderWithAdults
+            caption: >-
+              Количество граждан, поставленных на очередь для предоставления
+              земельного участка, имеющих детей старше 18 лет
+            format: number
+        groups:
+          fields: []
+          totals:
+            - name: total
+              caption: Всего
+              query:
+                source: info1
+                filter:
+                  if:
+                    - eq:
+                      - ':laws'
+                      - '1'
+                    - true
+                    - eq:
+                      - $law
+                      - ':laws'
+                fetch:
+                  refusedNoAdults:
+                    sum:
+                      - $refusedNoAdults
+                  refusedWithAdults:
+                    sum:
+                      - $refusedWithAdults
+                  orderNoAdults:
+                    sum:
+                      - $orderNoAdults
+                  orderWithAdults:
+                    sum:
+                      - $orderWithAdults
+  - name: operaionInfo2_2
+    caption: Оперативная инф. № 2 Ч2
+    sheets:
+      - name: operaionInfo2_2
+        caption: >-
+          Оперативная информация № 2 о количестве граждан, имеющих трех и более
+          детей, поставленных на учет для предоставления земельных участков в
+          собственность бесплатно
+        type: aggregation
+        source: info1
+        fetch:
+          placeDistrict: $placeDistrict
+          placeTown: $placeTown
+          target: $target
+          allocPlotsNoAdults:
+            sum:
+              - $allocPlotsNoAdults
+          allocPlotsWithAdults:
+            sum:
+              - $allocPlotsWithAdults
+          independPlotsNoAdults:
+            sum:
+              - $independPlotsNoAdults
+          independPlotsWithAdults:
+            sum:
+              - $independPlotsWithAdults
+          receivedPlots:
+            sum:
+              - $receivedPlots
+          transferIndependPlotsRefusal:
+            sum:
+              - $transferIndependPlotsRefusal
+          transferIndependPlotsAbsence:
+            sum:
+              - $transferIndependPlotsAbsence
+        sort:
+          placeDistrict: asc
+          placeTown: asc
+          target: asc
+        filter:
+          and:
+            - if:
+              - eq:
+                - ':laws'
+                - '1'
+              - true
+              - eq:
+                - $law
+                - ':laws'
+        params:
+          laws:
+            caption: Закон
+            format: int
+            select:
+              '1': 'все'
+              '2': 'до 104'
+              '3': 'от 104'
+        rangeFilters:
+          regDateBase:
+            caption: За период с|по
+            format: date
+            inclusive: both
+        columns:
+          - field: placeDistrict
+            caption: Район земельного участка
+            filter: true
+          - field: placeTown
+            caption: Населенный пункт земельного участка
+            filter: true
+          - field: target
+            caption: Категория земли
+            filter: true
+          - field: allocPlotsNoAdults
+            caption: 'Количество выделенных участков гражданам, имеющих детей до 18 лет'
+            format: number
+          - field: allocPlotsWithAdults
+            caption: >-
+              Количество выделенных участков гражданам, имеющих детей старше 18
+              лет
+            format: number
+          - field: independPlotsNoAdults
+            caption: >-
+              В т.ч. количество сформированных самостоятельно участков
+              гражданами, имеющих детей до 18 лет
+            format: number
+          - field: independPlotsWithAdults
+            caption: >-
+              В т.ч. количество сформированных самостоятельно участков
+              гражданами, имеющих детей старше 18 лет
+            format: number
+          - field: receivedPlots
+            caption: Количество граждан получивших земельные участки в аренду
+            format: number
+          - field: transferIndependPlotsRefusal
+            caption: Количество граждан переведенных на самостоятельное формирование в связи с двумя отказами
+            format: number
+          - field: transferIndependPlotsAbsence
+            caption: Количество граждан переведенных на самостоятельное формирование в связи с двумя неявками
+            format: number
+        groups:
+          fields: []
+          totals:
+            - name: total
+              caption: Всего
+              query:
+                source: info1
+                filter:
+                  if:
+                    - eq:
+                      - ':laws'
+                      - '1'
+                    - true
+                    - eq:
+                      - $law
+                      - ':laws'
+                fetch:
+                  allocPlotsNoAdults:
+                    sum:
+                      - $allocPlotsNoAdults
+                  allocPlotsWithAdults:
+                    sum:
+                      - $allocPlotsWithAdults
+                  independPlotsNoAdults:
+                    sum:
+                      - $independPlotsNoAdults
+                  independPlotsWithAdults:
+                    sum:
+                      - $independPlotsWithAdults
+                  receivedPlots:
+                    sum:
+                      - $receivedPlots
+                  transferIndependPlotsRefusal:
+                    sum:
+                      - $transferIndependPlotsRefusal
+                  transferIndependPlotsAbsence:
+                    sum:
+                      - $transferIndependPlotsAbsence
+  - name: operaionInfo2_3
+    caption: Оперативная инф. № 2 Ч3
+    sheets:
+      - name: operaionInfo2_3
+        caption: >-
+          Оперативная информация № 2 о количестве граждан, имеющих трех и более
+          детей, поставленных на учет для предоставления земельных участков в
+          собственность бесплатно
+        type: aggregation
+        source: info1
+        fetch:
+          placeDistrict: $placeDistrict
+          placeTown: $placeTown
+          target: $target
+          unregApplicationNoAdults:
+            sum:
+              - $unregApplicationNoAdults
+          unregApplicationWithAdults:
+            sum:
+              - $unregApplicationWithAdults
+          unregOutsideRegionNoAdults:
+            sum:
+              - $unregOutsideRegionNoAdults
+          unregOutsideRegionWithAdults:
+            sum:
+              - $unregOutsideRegionWithAdults
+          unregLossRightNoAdults:
+            sum:
+              - $unregLossRightNoAdults
+          unregLossRightWithAdults:
+            sum:
+              - $unregLossRightWithAdults
+        sort:
+          placeDistrict: asc
+          placeTown: asc
+          target: asc
+        filter:
+          and:
+            - if:
+              - eq:
+                - ':laws'
+                - '1'
+              - true
+              - eq:
+                - $law
+                - ':laws'
+        params:
+          laws:
+            caption: Закон
+            format: int
+            select:
+              '1': 'все'
+              '2': 'до 104'
+              '3': 'от 104'
+        rangeFilters:
+          regDateBase:
+            caption: За период с|по
+            format: date
+            inclusive: both
+        columns:
+          - field: placeDistrict
+            caption: Район земельного участка
+            filter: true
+          - field: placeTown
+            caption: Населенный пункт земельного участка
+            filter: true
+          - field: target
+            caption: Категория земли
+            filter: true
+          - field: unregApplicationNoAdults
+            caption: >-
+              Количество граждан, имеющих детей до 18 лет, снятых с учета по
+              заявлению
+            format: number
+          - field: unregApplicationWithAdults
+            caption: >-
+              Количество граждан, имеющих детей старше 18 лет, снятых с учета по
+              заявлению
+            format: number
+          - field: unregOutsideRegionNoAdults
+            caption: >-
+              Количество граждан, имеющих детей до 18 лет, снятых с учета в
+              связи с выездом за пределы края
+            format: number
+          - field: unregOutsideRegionWithAdults
+            caption: >-
+              Количество граждан, имеющих детей старше 18 лет, снятых с учета в
+              связи с выездом за пределы края
+            format: number
+          - field: unregLossRightNoAdults
+            caption: >-
+              Количество граждан, имеющих детей до 18 лет, снятых с учета в
+              связи с утратой права
+            format: number
+          - field: unregLossRightWithAdults
+            caption: >-
+              Количество граждан, имеющих детей старше 18 лет, снятых с учета в
+              связи с утратой права
+            format: number
+        groups:
+          fields: []
+          totals:
+            - name: total
+              caption: Всего
+              query:
+                source: info1
+                filter:
+                  if:
+                    - eq:
+                      - ':laws'
+                      - '1'
+                    - true
+                    - eq:
+                      - $law
+                      - ':laws'
+                fetch:
+                  unregApplicationNoAdults:
+                    sum:
+                      - $unregApplicationNoAdults
+                  unregApplicationWithAdults:
+                    sum:
+                      - $unregApplicationWithAdults
+                  unregOutsideRegionNoAdults:
+                    sum:
+                      - $unregOutsideRegionNoAdults
+                  unregOutsideRegionWithAdults:
+                    sum:
+                      - $unregOutsideRegionWithAdults
+                  unregLossRightNoAdults:
+                    sum:
+                      - $unregLossRightNoAdults
+                  unregLossRightWithAdults:
+                    sum:
+                      - $unregLossRightWithAdults
+  - name: operaionInfoFull
+    caption: Оперативная инф. Сводная
+    sheets:
+      - name: operaionInfoFull
+        caption: >-
+          Оперативная информация № 2 о количестве граждан, имеющих трех и более
+          детей, поставленных на учет для предоставления земельных участков в
+          собственность бесплатно
+        type: aggregation
+        source: info1
+        fetch:
+          placeMun: $placeMun
+          target: $target
+          refusedNoAdults:
+            sum:
+              - $refusedNoAdults
+          refusedWithAdults:
+            sum:
+              - $refusedWithAdults
+          orderNoAdults:
+            sum:
+              - $orderNoAdults
+          orderWithAdults:
+            sum:
+              - $orderWithAdults
+          allocPlotsNoAdults:
+            sum:
+              - $allocPlotsNoAdults
+          allocPlotsWithAdults:
+            sum:
+              - $allocPlotsWithAdults
+          independPlotsNoAdults:
+            sum:
+              - $independPlotsNoAdults
+          independPlotsWithAdults:
+            sum:
+              - $independPlotsWithAdults
+          receivedPlots:
+            sum:
+              - $receivedPlots
+          transferIndependPlotsRefusal:
+            sum:
+              - $transferIndependPlotsRefusal
+          transferIndependPlotsAbsence:
+            sum:
+              - $transferIndependPlotsAbsence
+          unregApplicationNoAdults:
+            sum:
+              - $unregApplicationNoAdults
+          unregApplicationWithAdults:
+            sum:
+              - $unregApplicationWithAdults
+          unregOutsideRegionNoAdults:
+            sum:
+              - $unregOutsideRegionNoAdults
+          unregOutsideRegionWithAdults:
+            sum:
+              - $unregOutsideRegionWithAdults
+          unregLossRightNoAdults:
+            sum:
+              - $unregLossRightNoAdults
+          unregLossRightWithAdults:
+            sum:
+              - $unregLossRightWithAdults
+        sort:
+          placeMun: asc
+          target: asc
+        filter:
+          if:
+            - eq:
+              - ':laws'
+              - '1'
+            - true
+            - eq:
+              - $law
+              - ':laws'
+        params:
+          laws:
+            caption: Закон
+            format: int
+            select:
+              '1': 'все'
+              '2': 'до 104'
+              '3': 'от 104'
+        rangeFilters:
+          regDateBase:
+            caption: За период с|по
+            format: date
+            inclusive: both
+        columns:
+          - field: placeMun
+            caption: Муниципальное образование земельного участка
+            filter: true
+          - field: target
+            caption: Категория земли
+            filter: true
+          - field: refusedNoAdults
+            caption: >-
+              Количество вынесенных отказов о постановке на учет граждан,
+              имеющих детей до 18 лет
+            format: number
+          - field: refusedWithAdults
+            caption: >-
+              Количество вынесенных отказов о постановке на учет граждан,
+              имеющих детей старше 18 лет
+            format: number
+          - field: orderNoAdults
+            caption: >-
+              Количество граждан, поставленных на очередь для предоставления
+              земельного участка, имеющих детей до 18 лет
+            format: number
+          - field: orderWithAdults
+            caption: >-
+              Количество граждан, поставленных на очередь для предоставления
+              земельного участка, имеющих детей старше 18 лет
+            format: number
+          - field: allocPlotsNoAdults
+            caption: 'Количество выделенных участков гражданам, имеющих детей до 18 лет'
+            format: number
+          - field: allocPlotsWithAdults
+            caption: >-
+              Количество выделенных участков гражданам, имеющих детей старше 18
+              лет
+            format: number
+          - field: independPlotsNoAdults
+            caption: >-
+              В т.ч. количество сформированных самостоятельно участков
+              гражданами, имеющих детей до 18 лет
+            format: number
+          - field: independPlotsWithAdults
+            caption: >-
+              В т.ч. количество сформированных самостоятельно участков
+              гражданами, имеющих детей старше 18 лет
+            format: number
+          - field: receivedPlots
+            caption: Количество граждан получивших земельные участки в аренду
+            format: number
+          - field: transferIndependPlotsRefusal
+            caption: Количество граждан переведенных на самостоятельное формирование в связи с двумя отказами
+            format: number
+          - field: transferIndependPlotsAbsence
+            caption: Количество граждан переведенных на самостоятельное формирование в связи с двумя неявками
+            format: number
+          - field: unregApplicationNoAdults
+            caption: >-
+              Количество граждан, имеющих детей до 18 лет, снятых с учета по
+              заявлению
+            format: number
+          - field: unregApplicationWithAdults
+            caption: >-
+              Количество граждан, имеющих детей старше 18 лет, снятых с учета по
+              заявлению
+            format: number
+          - field: unregOutsideRegionNoAdults
+            caption: >-
+              Количество граждан, имеющих детей до 18 лет, снятых с учета в
+              связи с выездом за пределы края
+            format: number
+          - field: unregOutsideRegionWithAdults
+            caption: >-
+              Количество граждан, имеющих детей старше 18 лет, снятых с учета в
+              связи с выездом за пределы края
+            format: number
+          - field: unregLossRightNoAdults
+            caption: >-
+              Количество граждан, имеющих детей до 18 лет, снятых с учета в
+              связи с утратой права
+            format: number
+          - field: unregLossRightWithAdults
+            caption: >-
+              Количество граждан, имеющих детей старше 18 лет, снятых с учета в
+              связи с утратой права
+            format: number
+        groups:
+          fields: []
+          totals:
+            - name: total
+              caption: Всего
+              query:
+                source: info1
+                filter:
+                  if:
+                    - eq:
+                      - ':laws'
+                      - '1'
+                    - true
+                    - eq:
+                      - $law
+                      - ':laws'
+                fetch:
+                  refusedNoAdults:
+                    sum:
+                      - $refusedNoAdults
+                  refusedWithAdults:
+                    sum:
+                      - $refusedWithAdults
+                  orderNoAdults:
+                    sum:
+                      - $orderNoAdults
+                  orderWithAdults:
+                    sum:
+                      - $orderWithAdults
+                  allocPlotsNoAdults:
+                    sum:
+                      - $allocPlotsNoAdults
+                  allocPlotsWithAdults:
+                    sum:
+                      - $allocPlotsWithAdults
+                  independPlotsNoAdults:
+                    sum:
+                      - $independPlotsNoAdults
+                  independPlotsWithAdults:
+                    sum:
+                      - $independPlotsWithAdults
+                  receivedPlots:
+                    sum:
+                      - $receivedPlots
+                  transferIndependPlotsRefusal:
+                    sum:
+                      - $transferIndependPlotsRefusal
+                  transferIndependPlotsAbsence:
+                    sum:
+                      - $transferIndependPlotsAbsence
+                  unregApplicationNoAdults:
+                    sum:
+                      - $unregApplicationNoAdults
+                  unregApplicationWithAdults:
+                    sum:
+                      - $unregApplicationWithAdults
+                  unregOutsideRegionNoAdults:
+                    sum:
+                      - $unregOutsideRegionNoAdults
+                  unregOutsideRegionWithAdults:
+                    sum:
+                      - $unregOutsideRegionWithAdults
+                  unregLossRightNoAdults:
+                    sum:
+                      - $unregLossRightNoAdults
+                  unregLossRightWithAdults:
+                    sum:
+                      - $unregLossRightWithAdults
+  - name: adminInfo
+    caption: Выписка для администрации
+    sheets:
+      - name: adminInfo
+        caption: >-
+          Выписка из журнала очередности граждан, имеющих трех и более детей,
+          поставленных на учет для предоставления земельных участков в
+          собственность бесплатно
+        type: list
+#        pageSize: 10000
+        pageSize: 100
+        source: info2
+        sort:
+          regDateBase: asc
+          placeDistrict: asc
+          placeTown: asc
+          target: asc
+        rangeFilters:
+          regDateBase:
+            caption: За период с|по
+            format: date
+            inclusive: both
+        fetch:
+          declarId: $declarId
+          placeDistrict: $placeDistrict
+          placeTown: $placeTown
+          target: $target
+          nkar: $nkar
+          fioApplicant: $fioApplicant
+          regDateBase: $regDateBase
+          contactApplicant: $contactApplicant
+          placeArea: $placeArea
+          orderNum:
+            if:
+              - and:
+                - ne:
+                  - substr:
+                    - $nkar
+                    - 0
+                    - 4
+                  - 'NEW\'
+                - nempty:
+                  - $nkar
+              - $orderNum
+              - '-'
+          cancelInfo:
+            collect:
+              - cancelFamily
+              - info: $info
+              - fam
+              - family
+              - date: desc
+          comment: $comment
+        columns:
+          - field: placeDistrict
+            caption: Район земельного участка
+            format: string
+            filter:
+              source: info2
+              field: placeDistrict
+              sort:
+                placeDistrict: asc
+          - field: placeTown
+            caption: Населенный пункт земельного участка
+            format: string
+            filter:
+              source: info2
+              field: placeTown
+              sort:
+                placeTown: asc
+          - field: target
+            caption: Категория земли
+            format: string
+            filter:
+              source: info2
+              field: target
+              sort:
+                target: asc
+          - field: fioApplicant
+            caption: 'Фамилия, имя, отчество заявителя'
+            format: string
+            filter:
+              source: info2
+              field: fioApplicant
+              sort:
+                fioApplicant: asc
+         # nkar для проверок
+#          - field: nkar
+#            caption: 'Nkar'
+#            format: string
+          - field: regDateBaseFix
+            caption: Дата и время регистрации заявления
+            format: string
+          - field: contactApplicant
+            caption: 'Адрес регистрации заявителя, контактный телефон'
+            format: string
+          - field: placeArea
+            caption: Местоположение земельного участка
+            format: string
+          - field: orderNum
+            caption: Номер очереди
+            format: string
+          - field: cancelInfo.info
+            caption: Информация об отказах от предложенных земельных участков
+            format: string
+          - field: comment
+            caption: Примечание
+            format: string
+            filter:
+              source: info2
+              field: comment
+              sort:
+                comment: asc
+          # substitute:
+          #   regDate: regDateBaseFix
+        process:
+          regDateBaseFix:
+            dateFormat:
+              - dateAdd:
+                - $regDateBase
+                - -10
+                - h
+              - LLL
+              - ru
+  - name: reestrInfo
+    caption: Выписка из Единого реестра граждан по новому постановлению
+    sheets:
+      - name: main
+        caption: Выписка из Единого реестра граждан
+        type: list
+        pageSize: 100
+        source: info3
+        sort:
+          regDateBase: asc
+          placeMun: asc
+          target: asc
+        rangeFilters:
+          regDateBase:
+            caption: За период с|по
+            format: date
+            inclusive: both
+        fetch:
+          declarId: $declarId
+          placeMun: $placeMun
+          target: $target
+          regDateBase: $regDateBase
+          regNum: $regNum
+          orderNum: $orderNum
+          family:
+            collect:
+              - family
+              - fio: $fio
+                personLink: $personLink
+                dateBorn: $dateBorn
+                idDoc:
+                  collect:
+                    - idDocs
+                    - num: $num
+                    - personId
+                    - person
+                    - date: desc
+              - fam
+              - famId
+              - dateBorn: desc
+          contactAddress: $contactAddress
+          contactPhone: $contactPhone
+          contactEmail: $contactEmail
+          comment: $comment
+          placeArea: $placeArea
+          absenceInfo:
+            collect:
+              - absenceFamily
+              - info: $info
+              - fam
+              - family
+              - date: desc
+          cancelInfo:
+            collect:
+              - cancelFamily
+              - info: $info
+              - fam
+              - family
+              - date: desc
+          familyProvidedRentInfo: $familyProvidedRentInfo
+        columns:
+          - caption: Дополнительные фильтры
+            columns:
+              - field: placeMun
+                caption: Муниципальное образование земельного участка
+                format: string
+                filter:
+                  source: info3
+                  field: placeMun
+                  sort:
+                    placeMun: asc
+              - field: target
+                caption: Категория земли
+                format: string
+                filter:
+                  source: info3
+                  field: target
+                  sort:
+                    target: asc
+              - field: comment
+                format: string
+                caption: Примечание
+                filter:
+                  source: info3
+                  field: comment
+                  sort:
+                    comment: asc
+          - caption: Заяление
+            columns:
+              - field: regDateBase
+                caption: Дата приема
+                format: date
+              - field: regNum
+                caption: Регистрационный номер
+                format: string
+              - field: orderNum
+                caption: 'Номер очереди граждан, ранее поставленных на учет'
+                format: string
+          - caption: Состав многодетной семьи
+            columns:
+              - field: family.fio
+                caption: Ф.И.О.
+                format: string
+              - field: family.personLink
+                caption: Степень родства
+                format: string
+              - field: family.dateBorn
+                caption: Дата рождения
+                format: date
+              - field: family.idDoc.num
+                caption: 'Документ, удостоверяющий личность'
+                format: string
+          - caption: Контактные данные
+            columns:
+              - field: contactAddress
+                caption: Адрес
+              - field: contactPhone
+                caption: Телефон
+              - field: contactEmail
+                caption: Электронная почта
+          - caption: Земельный участок
+            columns:
+              - field: placeArea
+                caption: Местоположение
+              - field: target
+                caption: Цель предоставления
+          - caption: Дополнительные сведения
+            columns:
+              - field: absenceInfo.info
+                caption: О неявках
+              - field: cancelInfo.info
+                caption: Об отказах
+              - field: familyProvidedRentInfo
+                caption: О предоставленных в аренду земельных участках
+  - name: failFamilyLink
+    caption: Нет семьи в заявлении
+    sheets:
+      - name: failFamilyLink
+        caption: >-
+          Проверка на отсутствие семьи в заявлении
+        type: list
+        pageSize: 100
+        source: failDeclParams
+        fetch:
+          regDate: $regDate
+          regNum: $regNum
+          bdNkar: $bdNkar
+          familyLinkNull: $familyLinkNull
+          emptyParents: $emptyParents
+        sort:
+          regDate: asc
+        rangeFilters:
+          regDate:
+            caption: За период с|по
+            format: date
+            inclusive: both
+        columns:
+          - field: regDate
+            caption: Дата приема
+            format: date
+          - field: regNum
+            caption: Регистрационный номер
+            format: string
+          - field: bdNkar
+            caption: Источник заявления
+            format: string
+          - field: familyLinkNull
+            caption: Наличие семьи в заявлении
+            format: string
+            filter:
+              source: failDeclParams
+              field: familyLinkNull
+              sort:
+                familyLinkNull: asc
+          - field: emptyParents
+            caption: Наличие родителей в семье
+            format: string
+            filter:
+              source: failDeclParams
+              field: emptyParents
+              sort:
+                emptyParents: asc
+  - name: failFamilySplit
+    caption: Проверка семьи
+    sheets:
+      - name: failFamilyLink
+        caption: >-
+          Проверка семьи в заявлении (6 и более детей)
+        type: list
+        pageSize: 100
+        source: familyBase
+        fetch:
+          famId: $famId
+          regDate: $regDate
+          famBd: $famBd
+          childsInfo:
+            collect:
+              - family
+              - fio: $fio
+                personLink: $personLink
+                personNkar: $personNkar
+              - famId
+              - famId
+              - personLink: desc
+          childsCount: $childsCount
+        filter:
+          gte:
+            - $childsCount
+            - 6
+        sort:
+          regDate: asc
+        rangeFilters:
+          regDate:
+            caption: За период с|по
+            format: date
+            inclusive: both
+        columns:
+          - field: regDate
+            caption: Дата приема
+            format: date
+          - field: famBd
+            caption: Источник семьи
+            format: string
+          - field: childsCount
+            caption: Количество детей
+            format: string
+          - field: childsInfo.personLink
+            caption: Родство
+            format: string
+          - field: childsInfo.personNkar
+            caption: Источник персон
+            format: string
+          - field: childsInfo.fio
+            caption: ФИО
+            format: string
+  - name: failChild
+    caption: Проверка детей
+    sheets:
+      - name: failChild
+        caption: >-
+          Проверка данных по детям
+        type: list
+        pageSize: 100
+        source: failDeclParamsByChild
+        fetch:
+          childsDateBorn: $childsDateBorn
+          regDate: $regDate
+          regNum: $regNum
+          childsCollNull: $childsCollNull
+          childsAgeByDecl: $childsAgeByDecl
+        sort:
+          regDate: asc
+        rangeFilters:
+          regDate:
+            caption: За период с|по
+            format: date
+            inclusive: both
+        columns:
+          - field: childsDateBorn
+            caption: Дата рождения ребенка
+            format: date
+          - field: regDate
+            caption: Дата приема заявления
+            format: date
+          - field: regNum
+            caption: Регистрационный номер
+            format: string
+          - field: childsCollNull
+            caption: Наличие детей в семье
+            format: string
+            filter:
+              source: failDeclParamsByChild
+              field: childsCollNull
+              sort:
+                childsCollNull: asc
+          - field: childsAgeByDecl
+            caption: Проверка даты рождения детей
+            format: string
+            filter:
+              source: failDeclParamsByChild
+              field: childsAgeByDecl
+              sort:
+                childsAgeByDecl: asc
+  - name: operaionInfoAll
+    caption: 'Проверка отчетов Оперативная инф. № 2'
+    sheets:
+      - name: operaionInfoAll
+        caption: >-
+          Проверка отчетов "Оперативная инф. № 2"
+        type: list
+#        pageSize: 20000
+        pageSize: 100
+        source: info1
+        fetch:
+          placeDistrict: $placeDistrict
+          placeTown: $placeTown
+          target: $target
+          nkar: $nkar
+          bdName: $bdName
+          fioApplicant: $fioApplicant
+          checkParams: $checkParams
+          errorsParams: $errorsParams
+          refusedNoAdults: $refusedNoAdults
+          refusedWithAdults: $refusedWithAdults
+          orderNoAdults: $orderNoAdults
+          orderWithAdults: $orderWithAdults
+          allocPlotsNoAdults: $allocPlotsNoAdults
+          allocPlotsWithAdults: $allocPlotsWithAdults
+          independPlotsNoAdults: $independPlotsNoAdults
+          independPlotsWithAdults: $independPlotsWithAdults
+          receivedPlots: $receivedPlots
+          transferIndependPlotsRefusal: $transferIndependPlotsRefusal
+          transferIndependPlotsAbsence: $transferIndependPlotsAbsence
+          unregApplicationNoAdults: $unregApplicationNoAdults
+          unregApplicationWithAdults: $unregApplicationWithAdults
+          unregOutsideRegionNoAdults: $unregOutsideRegionNoAdults
+          unregOutsideRegionWithAdults: $unregOutsideRegionWithAdults
+          unregLossRightNoAdults: $unregLossRightNoAdults
+          unregLossRightWithAdults: $unregLossRightWithAdults
+        sort:
+          checkParams: asc
+          placeDistrict: asc
+          placeTown: asc
+          target: asc
+#  только Архив
+        # filter:
+        #   like:
+        #     - $nkar
+        #     - '^Архив'
+        filter:
+          and:
+            - if:
+              - eq:
+                - ':laws'
+                - '1'
+              - true
+              - eq:
+                - $law
+                - ':laws'
+            # - gte:
+            #   - $regDateBase
+            #   - ':regDateBaseStart'
+            # - lte:
+            #   - $regDateBase
+            #   - ':regDateBaseEnd'
+        params:
+          laws:
+            caption: Закон
+            format: int
+            select:
+              '1': 'все'
+              '2': 'до 104'
+              '3': 'от 104'
+          # regDateBaseStart:
+          #   caption: За период с
+          #   format: date
+          # regDateBaseEnd:
+          #   caption: по
+          #   format: date
+        rangeFilters:
+          regDateBase:
+            caption: За период с|по
+            format: date
+            inclusive: both
+        columns:
+          - field: placeDistrict
+            caption: Район земельного участка
+            format: string
+            filter:
+              source: info1
+              field: placeDistrict
+              sort:
+                placeDistrict: asc
+          - field: placeTown
+            caption: Населенный пункт земельного участка
+            format: string
+            filter:
+              source: info1
+              field: placeTown
+              sort:
+                placeTown: asc
+          - field: target
+            caption: Категория земли
+            filter: true
+          - field: fioApplicant
+            caption: 'Фамилия, имя, отчество заявителя'
+            format: string
+            filter:
+              source: info1
+              field: fioApplicant
+              sort:
+                fioApplicant: asc
+          - field: checkParams
+            caption: Проверка подсчета стоящих на учете
+          # - field: errorsParams
+          #   caption: Обнаруженные ошибки в данных
+          #   filter:
+          #     source: info1
+          #     field: errorsParams
+          #     sort:
+          #       errorsParams: asc
+          - field: nkar
+            caption: Код заявления из FoxPro
+            format: string
+          - field: bdName
+            caption: Название БД источника
+            format: string
+          - field: refusedNoAdults
+            caption: >-
+              Количество вынесенных отказов о постановке на учет граждан,
+              имеющих детей до 18 лет
+            format: number
+          - field: refusedWithAdults
+            caption: >-
+              Количество вынесенных отказов о постановке на учет граждан,
+              имеющих детей старше 18 лет
+            format: number
+          - field: orderNoAdults
+            caption: >-
+              Количество граждан, поставленных на очередь для предоставления
+              земельного участка, имеющих детей до 18 лет
+            format: number
+          - field: orderWithAdults
+            caption: >-
+              Количество граждан, поставленных на очередь для предоставления
+              земельного участка, имеющих детей старше 18 лет
+            format: number
+          - field: allocPlotsNoAdults
+            caption: 'Количество выделенных участков гражданам, имеющих детей до 18 лет'
+            format: number
+          - field: allocPlotsWithAdults
+            caption: >-
+              Количество выделенных участков гражданам, имеющих детей старше 18
+              лет
+            format: number
+          - field: independPlotsNoAdults
+            caption: >-
+              В т.ч. количество сформированных самостоятельно участков
+              гражданами, имеющих детей до 18 лет
+            format: number
+          - field: independPlotsWithAdults
+            caption: >-
+              В т.ч. количество сформированных самостоятельно участков
+              гражданами, имеющих детей старше 18 лет
+            format: number
+          - field: receivedPlots
+            caption: Количество граждан получивших земельные участки в аренду
+            format: number
+          - field: transferIndependPlotsRefusal
+            caption: Количество граждан переведенных на самостоятельное формирование в связи с двумя отказами
+            format: number
+          - field: transferIndependPlotsAbsence
+            caption: Количество граждан переведенных на самостоятельное формирование в связи с двумя неявками
+            format: number
+          - field: unregApplicationNoAdults
+            caption: >-
+              Количество граждан, имеющих детей до 18 лет, снятых с учета по
+              заявлению
+            format: number
+          - field: unregApplicationWithAdults
+            caption: >-
+              Количество граждан, имеющих детей старше 18 лет, снятых с учета по
+              заявлению
+            format: number
+          - field: unregOutsideRegionNoAdults
+            caption: >-
+              Количество граждан, имеющих детей до 18 лет, снятых с учета в
+              связи с выездом за пределы края
+            format: number
+          - field: unregOutsideRegionWithAdults
+            caption: >-
+              Количество граждан, имеющих детей старше 18 лет, снятых с учета в
+              связи с выездом за пределы края
+            format: number
+          - field: unregLossRightNoAdults
+            caption: >-
+              Количество граждан, имеющих детей до 18 лет, снятых с учета в
+              связи с утратой права
+            format: number
+          - field: unregLossRightWithAdults
+            caption: >-
+              Количество граждан, имеющих детей старше 18 лет, снятых с учета в
+              связи с утратой права
+            format: number

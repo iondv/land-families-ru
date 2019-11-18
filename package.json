@@ -1,0 +1,30 @@
+{
+  "name": "land-families-ru",
+  "description": "Реестр многодетных",
+  "version": "1.8.0",
+  "license": "ION DV",
+  "homepage": "http://childzem.iondv.ru/",
+  "bugs": {
+    "url": "https://github/iondv/land-families-ru.git/issues"
+  },
+  "engines": {
+    "ion": "2.1.7"
+  },
+  "iontype": "app",
+  "repository": {
+    "type": "git",
+    "url": "https://github/iondv/land-families-ru.git"
+  },
+  "ionModulesDependencies": {
+    "registry": "3.1.0",
+    "soap": "1.1.8",
+    "report": "2.0.3",
+    "dashboard": "1.1.8",
+    "ionadmin": "3.1.0"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "convert-import": "git+https://git.iondv.ru/node-modules/convert-import",
+    "node-dbf": "git+https://github.com/akumidv/node-dbf"
+  }
+}

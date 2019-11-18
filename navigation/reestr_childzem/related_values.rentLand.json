@@ -1,0 +1,16 @@
+{
+  "code": "related_values.rentLand",
+  "orderNumber": 60,
+  "type": 1,
+  "title": "",
+  "caption": "Договор аренды участка",
+  "classname": "rentLand",
+  "container": null,
+  "collection": null,
+  "url": null,
+  "hint": null,
+  "conditions": [],
+  "sorting": [],
+  "pathChains": [],
+  "metaVersion": "2.0.61.18033"
+}

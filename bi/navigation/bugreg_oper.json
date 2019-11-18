@@ -1,0 +1,9 @@
+{
+  "code": "bugreg_oper",
+  "caption": "Проверка оперативной информации",
+  "parent": "bugreg",
+  "mine": "land-families-ru@childzem",
+  "report": "operaionInfoAll",
+  "namespace": "land-families-ru",
+  "order": 3
+}

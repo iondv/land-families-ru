@@ -1,0 +1,9 @@
+{
+  "code": "oper2_part0",
+  "caption": "Оперативная инф. Сводная",
+  "parent": "oper2",
+  "mine": "land-families-ru@childzem",
+  "report": "operaionInfoFull",
+  "namespace": "land-families-ru",
+  "order": 0
+}

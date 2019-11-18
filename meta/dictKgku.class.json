@@ -1,0 +1,17 @@
+{
+  "isStruct": false,
+  "key": [],
+  "semantic": "",
+  "name": "dictKgku",
+  "version": "",
+  "caption": "КГКУ ЦСПН",
+  "ancestor": "baseDict",
+  "container": null,
+  "creationTracker": "",
+  "changeTracker": "",
+  "history": 0,
+  "journaling": true,
+  "compositeIndexes": null,
+  "properties": [],
+  "metaVersion": "2.0.61.17118"
+}

@@ -1,0 +1,9 @@
+{
+  "code": "bugreg_split",
+  "caption": "Проверка семьи",
+  "parent": "bugreg",
+  "mine": "land-families-ru@childzem",
+  "report": "failFamilySplit",
+  "namespace": "land-families-ru",
+  "order": 4
+}

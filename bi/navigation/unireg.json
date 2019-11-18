@@ -1,0 +1,8 @@
+{
+  "code": "unireg",
+  "caption": "Выписка из Единого реестра граждан",
+  "mine": "land-families-ru@childzem",
+  "report": "reestrInfo",
+  "namespace": "land-families-ru",
+  "order": 2
+}

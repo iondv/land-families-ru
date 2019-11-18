@@ -1,0 +1,605 @@
+{
+  "namespace": "land-families-ru",
+  "globals": {
+    "moduleTitles": {
+      "registry": "Реестр",
+      "report": "Отчеты"
+    },
+    "jobs": {
+      "report-builder": {
+        "description": "Служба сборки шахт данных модуля отчетов",
+        "launch": {
+          "hour": 24
+        },
+        "worker": "rebuilder",
+        "di": {
+          "reportMeta": {
+            "module": "modules/report/lib/impl/DsReportMetaRepository",
+            "initMethod": "init",
+            "initLevel": 1,
+            "options": {
+              "dataSource": "ion://Db",
+              "calc": "ion://calculator"
+            }
+          },
+          "stdBuilder": {
+            "module": "modules/report/lib/impl/StdMineBuilder",
+            "options": {
+              "dataSource": "ion://Db",
+              "metaRepo": "ion://metaRepo",
+              "dataRepo": "ion://dataRepo"
+            }
+          },
+          "rebuilder": {
+            "executable": "modules/report/lib/rebuilder",
+            "options": {
+              "log": "ion://sysLog",
+              "meta": "ion://reportMeta",
+              "mineBuilders": {
+                "land-families-ru": {
+                  "childzem": {
+                    "acceptedDecision": "ion://stdBuilder",
+                    "outRegs": "ion://stdBuilder",
+                    "statementDeclarations": "ion://stdBuilder",
+                    "maxAcceptedDecisionByFam": "ion://stdBuilder",
+                    "maxOutRegsByFam": "ion://stdBuilder",
+                    "statementDeclarationsChangePeriod": "ion://stdBuilder",
+                    "minStatementDeclarationsByPeriod": "ion://stdBuilder",
+                    "declarChangePeriod": "ion://stdBuilder",
+                    "allModifDeclarations": "ion://stdBuilder",
+                    "lastDeclarChange": "ion://stdBuilder",
+                    "actualDeclData": "ion://stdBuilder",
+                    "baseFamilyDeclarations": "ion://stdBuilder",
+                    "regDateFamily": "ion://stdBuilder",
+                    "cancelFamily": "ion://stdBuilder",
+                    "absenceFamily": "ion://stdBuilder",
+                    "declParamsByLink": "ion://stdBuilder",
+                    "declParamsChild": "ion://stdBuilder",
+                    "failDeclParamsByChild": "ion://stdBuilder",
+                    "failDeclParams": "ion://stdBuilder",
+                    "familyParams": "ion://stdBuilder",
+                    "declParams": "ion://stdBuilder",
+                    "info1": "ion://stdBuilder",
+                    "info2": "ion://stdBuilder",
+                    "info3": "ion://stdBuilder",
+                    "family": "ion://stdBuilder",
+                    "familyBase": "ion://stdBuilder",
+                    "idDocs": "ion://stdBuilder"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "deployer": "built-in",
+  "modules": {
+    "registry": {
+      "globals": {
+        "inlineForm": true,
+        "concurencyCheck": 10000,
+        "eagerLoading": {
+          "*": {
+            "declaration@land-families-ru": {
+              "exportItem": [
+                "placeArea.district.name",
+                "placeArea.town.name",
+                "delivery.name",
+                "mFTS.value",
+                "kGKUTSSPN.value",
+                "delivPost.region",
+                "delivPost.town",
+                "delivPost.street",
+                "raspPost.region",
+                "raspPost.town",
+                "raspPost.street",
+                "rehPost.region",
+                "rehPost.town",
+                "rehPost.street",
+                "app.name",
+                "app.idDoc.typeDoc.name",
+                "decl.name",
+                "decl.idDoc.typeDoc.name",
+                "attorney.ser",
+                "fam.mother.name",
+                "fam.mother.idDoc.typeDoc.name",
+                "fam.mother.actualAdr.region",
+                "fam.mother.actualAdr.town",
+                "fam.mother.actualAdr.street",
+                "fam.father.name",
+                "fam.father.idDoc.typeDoc.name",
+                "fam.father.actualAdr.region",
+                "fam.father.actualAdr.town",
+                "fam.father.actualAdr.street",
+                "fam.childs.name",
+                "fam.childs.idDoc.typeDoc.name"
+              ],
+              "list": [
+                "fam.mother",
+                "fam.father",
+                "fam.childs"
+              ],
+              "item": [
+                "fam.mother",
+                "fam.father",
+                "placeArea.district",
+                "placeArea.town",
+                "delivPost.region",
+                "delivPost.town",
+                "delivPost.street",
+                "raspPost.region",
+                "raspPost.town",
+                "raspPost.street",
+                "rehPost.region",
+                "rehPost.town",
+                "rehPost.street",
+                "account.district",
+                "account.town"
+              ]
+            },
+            "person@land-families-ru": {
+              "list": [
+                "famChilds.mother",
+                "famChilds.father",
+                "famParentFemale.mother",
+                "famParentFemale.father",
+                "famParentMale.mother",
+                "famParentMale.father",
+                "actualAdr.region",
+                "actualAdr.town",
+                "actualAdr.street",
+                "factAdr.region",
+                "factAdr.town",
+                "factAdr.street"
+              ],
+              "item": [
+                "famChilds.mother",
+                "famChilds.father",
+                "famParentFemale.mother",
+                "famParentFemale.father",
+                "famParentMale.mother",
+                "famParentMale.father",
+                "actualAdr.region",
+                "actualAdr.town",
+                "actualAdr.street",
+                "factAdr.region",
+                "factAdr.town",
+                "factAdr.street"
+              ]
+            },
+            "family@land-families-ru": {
+              "exportItem": [
+                "declarActual.account",
+                "declarActual.placePet",
+                "declarActual.rehPost.region",
+                "declarActual.rehPost.town",
+                "declarActual.rehPost.street",
+                "declarActualEdit.placeArea.district.name",
+                "declarActualEdit.placeArea.town.name",
+                "cancel.authority",
+                "absence.authority",
+                "declarEdit.account.num",
+                "outReg.num",
+                "providedRent.rentLand.numAgr",
+                "grantedProperty.protocol.numDec",
+                "mother.name",
+                "mother.idDoc.typeDoc.name",
+                "mother.actualAdr.region",
+                "mother.actualAdr.town",
+                "mother.actualAdr.street",
+                "father.name",
+                "father.idDoc.typeDoc.name",
+                "father.actualAdr.region",
+                "father.actualAdr.town",
+                "father.actualAdr.street",
+                "childs.name",
+                "childs.idDoc.typeDoc.name"
+              ],
+              "list":[
+                "declar.account.district",
+                "outReg.declaration",
+                "grantedProperty.protocol",
+                "grantedProperty.town"
+              ],
+              "item": [
+                "declar.account.district",
+                "outReg.declaration",
+                "grantedProperty.protocol",
+                "grantedProperty.town",
+                "providedRent.rentLand",
+                "outReg.town"
+              ]
+            },
+            "refusalAbsence@land-families-ru": {
+              "list": [
+                "fam.mother",
+                "fam.father",
+                "fam.childs"
+              ],
+              "item": [
+                "fam.mother",
+                "fam.father",
+                "fam.childs"
+              ]
+            },
+            "removal@land-families-ru": {
+              "list": [
+                "fam.mother",
+                "fam.father",
+                "fam.childs"
+              ],
+              "item": [
+                "fam.mother",
+                "fam.father",
+                "fam.childs"
+              ]
+            },
+            "relationChildNew@land-families-ru": {
+              "list": [
+                "fam.mother",
+                "fam.father",
+                "fam.childs"
+              ],
+              "item": [
+                "fam.mother",
+                "fam.father",
+                "fam.childs"
+              ]
+            },
+            "familyNew@land-families-ru": {
+              "list": [
+                "childs.reas",
+                "pet.account.district"
+              ],
+              "item": [
+                "childs.reas",
+                "pet.account.district"
+              ]
+            },
+            "allocationLand@land-families-ru": {
+              "list": [
+                "zu.town"
+              ],
+              "item": [
+                "zu.town"
+              ]
+            }
+          }
+        },
+        "listSearchOptions": {
+          "declaration@land-families-ru": {
+            "*": {
+              "searchBy": [
+                "regNum",
+                "regNumOld"
+              ],
+              "splitBy": "\\s+",
+              "mode": [
+                "like",
+                "like"
+              ],
+              "joinBy": "and"
+            }
+          },
+          "family@land-families-ru": {
+            "*": {
+              "searchByRefs": [
+                {
+                  "class": "person@land-families-ru",
+                  "idProperties": [
+                    "famChilds",
+                    "famParentMale",
+                    "famParentFemale"
+                  ],
+                  "searchBy": [
+                    "surname",
+                    "name",
+                    "patronymic"
+                  ],
+                  "splitBy": "\\s+",
+                  "mode": [
+                    "starts",
+                    "starts",
+                    "starts"
+                  ],
+                  "joinBy": "and"
+                }
+              ]
+            }
+          },
+          "person@land-families-ru": {
+            "*": {
+              "searchBy": [
+                "surname",
+                "name",
+                "patronymic"
+              ],
+              "splitBy": "\\s+",
+              "mode": [
+                "starts",
+                "starts",
+                "starts"
+              ],
+              "joinBy": "and"
+            }
+          },
+          "document@land-families-ru": {
+            "*": {
+              "searchBy": [
+                "ser",
+                "numDoc",
+                "org"
+              ],
+              "splitBy": "\\s+",
+              "mode": [
+                "starts",
+                "starts",
+                "like"
+              ],
+              "joinBy": "and"
+            }
+          },
+          "adress@land-families-ru": {
+            "*": {
+              "searchBy": [
+                "postIndex",
+                "house",
+                "flat",
+                "adressValue"
+              ],
+              "splitBy": "\\s+",
+              "mode": [
+                "starts",
+                "starts",
+                "starts",
+                "like"
+              ],
+              "joinBy": "and"
+            }
+          }
+        },
+        "listSearchMinLength": 3,
+        "listSearchDelay": 2000,
+        "defaultPath": "land-families-ru@person",
+        "navigation": {
+          "namespaces": {
+            "land-families-ru": "Реестр многодетных"
+          },
+          "menus": {
+            "left": [
+              "reestr_childzem"
+            ]
+          }
+        },
+        "createByCopy": [
+          "person@land-families-ru"
+        ],
+        "di": {
+          "chzmListToExcel": {
+            "module": "modules/registry/export/listToExcel",
+            "initMethod": "init",
+            "initLevel": 0,
+            "options": {
+              "tplDir": "applications/land-families-ru/export/list",
+              "injectors": [
+                "ion://curDateInjector"
+              ]
+            }
+          },
+          "chzmItemToExcel": {
+            "module": "modules/registry/export/itemToExcel",
+            "initMethod": "init",
+            "initLevel": 0,
+            "options": {
+              "tplDir": "applications/land-families-ru/export/item",
+              "injectors": [
+                "ion://curDateInjector"
+              ]
+            }
+          },
+          "chzmListToDocx": {
+            "module": "modules/registry/export/listToDocx",
+            "initMethod": "init",
+            "initLevel": 0,
+            "options": {
+              "tplDir": "applications/land-families-ru/export/list",
+              "injectors": [
+                "ion://curDateInjector"
+              ]
+            }
+          },
+          "chzmItemToDocx": {
+            "module": "modules/registry/export/itemToDocx",
+            "initMethod": "init",
+            "initLevel": 0,
+            "options": {
+              "tplDir": "applications/land-families-ru/export/item",
+              "injectors": [
+                "ion://curDateInjector"
+              ]
+            }
+          },
+          "export": {
+            "options": {
+              "configs": {
+                "family@land-families-ru": {
+                  "chzmListToExcel": {
+                    "type": "list",
+                    "caption": "Экспорт в Excel",
+                    "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    "extension": "xlsx",
+                    "preprocessor": "ion://chzmListToExcel"
+                  },
+                  "chzmItemToExcel": {
+                    "type": "item",
+                    "caption": "Экспорт в Excel",
+                    "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    "extension": "xlsx",
+                    "preprocessor": "ion://chzmItemToExcel"
+                  },
+                  "chzmListToDocx": {
+                    "type": "list",
+                    "caption": "Экспорт в Docx",
+                    "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    "extension": "docx",
+                    "preprocessor": "ion://chzmListToDocx"
+                  },
+                  "chzmItemToDocx": {
+                    "type": "item",
+                    "caption": "Экспорт в Docx",
+                    "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    "extension": "docx",
+                    "preprocessor": "ion://chzmItemToDocx"
+                  }
+                },
+                "declaration@land-families-ru": {
+                  "chzmListToExcel": {
+                    "type": "list",
+                    "caption": "Экспорт в Excel",
+                    "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    "extension": "xlsx",
+                    "preprocessor": "ion://chzmListToExcel"
+                  },
+                  "chzmItemToExcel": {
+                    "type": "item",
+                    "caption": "Экспорт в Excel",
+                    "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    "extension": "xlsx",
+                    "preprocessor": "ion://chzmItemToExcel"
+                  },
+                  "chzmListToDocx": {
+                    "type": "list",
+                    "caption": "Экспорт в Docx",
+                    "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    "extension": "docx",
+                    "preprocessor": "ion://chzmListToDocx"
+                  },
+                  "chzmItemToDocx": {
+                    "type": "item",
+                    "caption": "Экспорт в Docx",
+                    "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    "extension": "docx",
+                    "preprocessor": "ion://chzmItemToDocx"
+                  }
+                }
+              }
+            }
+          },
+          "dataRepo": {
+            "module": "core/impl/datarepository/ionDataRepository",
+            "options": {
+              "dataSource": "ion://Db",
+              "metaRepository": "ion://metaRepo",
+              "fileStorage": "ion://fileStorage",
+              "imageStorage": "ion://imageStorage",
+              "log": "ion://sysLog",
+              "keyProvider": {
+                "name": "keyProvider",
+                "module": "core/impl/meta/keyProvider",
+                "options": {
+                  "metaRepo": "ion://metaRepo"
+                }
+              },
+              "maxEagerDepth": 6
+            }
+          },
+          "curDateInjector": {
+            "module": "applications/land-families-ru/export/injectors/CurDateInjector",
+            "options": {}
+          }
+        }
+      }
+    },
+    "report": {
+      "globals": {
+        "namespaces": {
+          "land-families-ru": "Реестр многодетных"
+        },
+        "defaultNav": {
+          "namespace": "land-families-ru",
+          "mine": "childzem",
+          "report": "operaionInfo2"
+        },
+        "mineBuilders": {
+          "land-families-ru": {
+            "childzem": {
+              "acceptedDecision": "mineBuilder",
+              "outRegs": "mineBuilder",
+              "statementDeclarations": "mineBuilder",
+              "maxAcceptedDecisionByFam": "mineBuilder",
+              "maxOutRegsByFam": "mineBuilder",
+              "statementDeclarationsChangePeriod": "mineBuilder",
+              "minStatementDeclarationsByPeriod": "mineBuilder",
+              "declarChangePeriod": "mineBuilder",
+              "allModifDeclarations": "mineBuilder",
+              "lastDeclarChange": "mineBuilder",
+              "actualDeclData": "mineBuilder",
+              "baseFamilyDeclarations": "mineBuilder",
+              "regDateFamily": "mineBuilder",
+              "cancelFamily": "mineBuilder",
+              "absenceFamily": "mineBuilder",
+              "declParamsByLink": "mineBuilder",
+              "declParamsChild": "mineBuilder",
+              "failDeclParamsByChild": "mineBuilder",
+              "failDeclParams": "mineBuilder",
+              "familyParams": "mineBuilder",
+              "declParams": "mineBuilder",
+              "info1": "mineBuilder",
+              "info2": "mineBuilder",
+              "info3": "mineBuilder",
+              "family": "mineBuilder",
+              "familyBase": "mineBuilder",
+              "idDocs": "mineBuilder"
+            }
+          }
+        },
+        "di": {
+        }
+      },
+      "import": {
+        "src": "applications/land-families-ru/bi",
+        "namespace": "land-families-ru"
+      }
+    },
+    "soap": {
+      "globals": {
+        "authMode": {
+          "childzemService": "none"
+        },
+        "di": {
+          "childzemService" : {
+            "module": "applications/land-families-ru/lib/service/childzem",
+            "options": {
+              "dataRepo": "ion://dataRepo",
+              "metaRepo": "ion://metaRepo",
+              "fileStorage": "ion://fileStorage"
+            }
+          }
+        }
+      }
+    },
+    "ionadmin": {
+      "globals": {
+        "defaultPath": "ionadmin",
+        "securityParams": {
+          "resourceTypes": {
+            "*": {
+              "title": "Общие"
+            },
+            "n:::": {
+              "title": "Навигация"
+            },
+            "c:::": {
+              "title": "Классы"
+            },
+            "ionadmin:::": {
+              "title": "Модуль администрирования"
+            }
+          }
+        }
+      }
+    }
+  }
+}

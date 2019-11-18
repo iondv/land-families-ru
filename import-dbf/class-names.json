@@ -1,0 +1,17 @@
+{
+  "declar": "declaration@land-families-ru",
+  "family": "family@land-families-ru",
+  "person": "person@land-families-ru",
+  "adress": "adress@land-families-ru",
+  "district": "adressDistrict@land-families-ru",
+  "town": "adressTown@land-families-ru",
+  "street": "adressStreet@land-families-ru",
+  "document": "document@land-families-ru",
+  "relationDegree": "relationDegree@land-families-ru",
+  "relationChild": "relationChild@land-families-ru",
+  "locationLand": "locationLand@land-families-ru",
+  "removal": "removal@land-families-ru",
+  "acceptedDecision": "acceptedDecision@land-families-ru",
+  "selectedLand": "selectedLand@land-families-ru",
+  "allocationLand": "allocationLand@land-families-ru"
+}

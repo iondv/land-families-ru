@@ -1,0 +1,27 @@
+{
+  "code": "person",
+  "orderNumber": 10,
+  "type": 1,
+  "title": "",
+  "caption": "Персона",
+  "classname": "person",
+  "container": null,
+  "collection": null,
+  "url": null,
+  "hint": null,
+  "conditions": [],
+  "sorting": [],
+  "pathChains": [],
+  "searchOptions": {
+    "person": {
+      "searchBy": [
+        "surname",
+        "name",
+        "patronymic"
+      ],
+      "splitBy": "\\s+",
+      "mode": ["starts", "starts", "starts"],
+      "joinBy": "and"
+    }
+  }
+}

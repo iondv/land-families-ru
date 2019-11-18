@@ -1,0 +1,15 @@
+{
+  "code": "referenses.surety",
+  "orderNumber": 10,
+  "type": 1,
+  "title": "",
+  "caption": "Доверенность",
+  "classname": "surety",
+  "container": null,
+  "collection": null,
+  "url": null,
+  "hint": null,
+  "conditions": [],
+  "sorting": [],
+  "pathChains": []
+}

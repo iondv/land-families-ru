@@ -1,0 +1,7 @@
+users:
+  - id: demo
+    name: Администратор
+    pwd: ion-demo
+    type: local
+    roles:
+      - Admins
