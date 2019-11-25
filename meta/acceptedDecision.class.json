@@ -356,7 +356,7 @@
       "autoassigned": false,
       "hint": null,
       "defaultValue": null,
-      "refClass": "adressDistrict",
+      "refClass": "area@fias",
       "itemsClass": "",
       "backRef": "",
       "backColl": "",
@@ -385,37 +385,13 @@
       "autoassigned": false,
       "hint": null,
       "defaultValue": null,
-      "refClass": "adressTown",
+      "refClass": "city@fias",
       "itemsClass": "",
       "backRef": "",
       "backColl": "",
       "binding": "",
       "semantic": null,
-      "selConditions": [
-        {
-          "property": null,
-          "operation": 1,
-          "value": null,
-          "nestedConditions": [
-            {
-              "property": "district",
-              "operation": 0,
-              "value": [
-                "$district"
-              ],
-              "nestedConditions": []
-            },
-            {
-              "property": "district",
-              "operation": 0,
-              "value": [
-                "NULL"
-              ],
-              "nestedConditions": []
-            }
-          ]
-        }
-      ],
+      "selConditions": [],
       "selSorting": [],
       "selectionProvider": null,
       "indexSearch": false,
