@@ -1,6 +1,8 @@
 # IONDV. Large-families
 
+IONDV. Large-families is a software solution based on IONDV. Framework, implemented to organize the accounting, storage and display of data on large families applying for a plot of land. The key essence is an Application that contains descriptive information, a link to information about the family and each of its members in the form of a person.
 
+The main advantage of using the system is to maintain a register of citizens registered as persons who have the right to receive land plots in ownership for free in the territory of the region. In addition, the system provides the maintenance of data on applications simultaneously for different regions, as well as the formation of analytical reports in various views.
 
 ## Описание  
 
