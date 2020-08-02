@@ -49,7 +49,7 @@ The main advantage of using the system is to maintain a register of citizens reg
 ```
 curl -L -s https://github.com/iondv/iondv-app/archive/master.zip > iondv-app.zip &&\
   unzip -p iondv-app.zip iondv-app-master/iondv-app > iondv-app &&\
-  bash iondv-app -q -i -m localhost:27017 land-families-ru
+  bash iondv-app -t git -q -i -m localhost:27017 land-families-ru
 ```
 Где вместо `localhost:27017` нужно указать адрес MongoDb. После запуска открыть ссылку 'http://localhost:8888', учетная запись бек офиса **demo**, пароль **ion-demo**.
 
